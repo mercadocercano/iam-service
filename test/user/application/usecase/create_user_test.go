@@ -9,6 +9,7 @@ import (
 
 	"iam/src/user/application/request"
 	"iam/src/user/application/usecase"
+	userEntity "iam/src/user/domain/entity"
 	"iam/src/user/domain/exception"
 	"iam/src/user/domain/value_object"
 	"iam/test/user/domain/entity"
@@ -91,7 +92,7 @@ func TestCreateUserUseCase_Execute(t *testing.T) {
 		mockRepo.ResetCallHistory()
 
 		existingUser := userMother.WithEmail("existente@example.com")
-		mockRepo.SetupUsers([]*entity.User{existingUser})
+		mockRepo.SetupUsers([]*userEntity.User{existingUser})
 
 		req := &request.CreateUserRequest{
 			Email:    "existente@example.com",

@@ -12,7 +12,7 @@ import (
 	"iam/src/user/domain/value_object"
 	roleEntity "iam/test/role/domain/entity"
 	tenantEntity "iam/test/tenant/domain/entity"
-	userEntity "iam/test/user/domain/entity"
+	userTestEntity "iam/test/user/domain/entity"
 	"iam/test/user/infrastructure/persistence/repository"
 )
 
@@ -23,7 +23,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 	ctx := context.Background()
 
 	// Object Mothers
-	userMother := userEntity.Create()
+	userMother := userTestEntity.Create()
 	tenantMother := tenantEntity.Create()
 	roleMother := roleEntity.Create()
 
@@ -37,7 +37,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		role := roleMother.User()
 		user := userMother.WithTenant(tenant.ID).WithRole(role.ID).WithStatus(value_object.StatusActive)
 
-		mockRepo.SetupUsers([]*userEntity.User{user})
+		mockRepo.SetupUsers([]*userTestEntity.User{user})
 
 		// Act
 		err := deleteUseCase.Execute(ctx, user.ID)
@@ -63,7 +63,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		role := roleMother.TenantAdminForTenant(tenant.ID)
 		user := userMother.WithTenant(tenant.ID).WithRole(role.ID).Pending()
 
-		mockRepo.SetupUsers([]*userEntity.User{user})
+		mockRepo.SetupUsers([]*userTestEntity.User{user})
 
 		// Act
 		err := deleteUseCase.Execute(ctx, user.ID)
@@ -84,7 +84,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		role := roleMother.ReadOnly()
 		user := userMother.WithTenant(tenant.ID).WithRole(role.ID).WithFederatedProvider("GOOGLE", "google123")
 
-		mockRepo.SetupUsers([]*userEntity.User{user})
+		mockRepo.SetupUsers([]*userTestEntity.User{user})
 
 		// Act
 		err := deleteUseCase.Execute(ctx, user.ID)
@@ -140,7 +140,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		role := roleMother.Custom()
 		user := userMother.WithTenant(tenant.ID).WithRole(role.ID)
 
-		mockRepo.SetupUsers([]*userEntity.User{user})
+		mockRepo.SetupUsers([]*userTestEntity.User{user})
 		mockRepo.ShouldFailOn("Delete")
 
 		// Act
@@ -168,7 +168,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		user1 := userMother.WithEmail("user1@tenant1.com").WithTenant(tenant1.ID).WithRole(role1.ID)
 		user2 := userMother.WithEmail("user2@tenant2.com").WithTenant(tenant2.ID).WithRole(role2.ID)
 
-		mockRepo.SetupUsers([]*userEntity.User{user1, user2})
+		mockRepo.SetupUsers([]*userTestEntity.User{user1, user2})
 
 		// Act - Eliminar el primer usuario
 		err := deleteUseCase.Execute(ctx, user1.ID)
@@ -182,7 +182,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		users := mockRepo.GetUsers()
 		assert.Len(t, users, 2)
 
-		var deletedUser, activeUser *userEntity.User
+		var deletedUser, activeUser *userTestEntity.User
 		for _, u := range users {
 			if u.ID == user1.ID {
 				deletedUser = u
@@ -206,7 +206,7 @@ func TestDeleteUserUseCase_Execute(t *testing.T) {
 		systemRole := roleMother.SystemAdmin()
 		user := userMother.WithRole(systemRole.ID).WithEmail("admin@system.com")
 
-		mockRepo.SetupUsers([]*userEntity.User{user})
+		mockRepo.SetupUsers([]*userTestEntity.User{user})
 
 		// Act
 		err := deleteUseCase.Execute(ctx, user.ID)
