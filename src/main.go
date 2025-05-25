@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"iam/src/auth/infrastructure/config"
 	planConfig "iam/src/plan/infrastructure/config"
@@ -24,7 +25,24 @@ func main() {
 	defer db.Close()
 
 	// Configuración del router
-	router := gin.Default()
+	router := gin.New() // Usar gin.New() para evitar middlewares duplicados
+
+	// Agregar middlewares básicos necesarios
+	router.Use(gin.Logger())
+	router.Use(gin.Recovery())
+
+	// Configurar Prometheus metrics si está habilitado
+	prometheusEnabled := os.Getenv("PROMETHEUS_ENABLED")
+	log.Printf("PROMETHEUS_ENABLED value: '%s'", prometheusEnabled)
+
+	if prometheusEnabled == "true" {
+		log.Println("Registering /metrics endpoint")
+		// Endpoint de métricas usando la librería oficial de Prometheus
+		router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		log.Println("/metrics endpoint registered successfully")
+	} else {
+		log.Println("Prometheus metrics disabled")
+	}
 
 	// Configuración de CORS
 	router.Use(func(c *gin.Context) {
