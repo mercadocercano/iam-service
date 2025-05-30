@@ -1,48 +1,142 @@
 package criteria
 
 import (
-	"github.com/gin-gonic/gin"
+	"net/url"
 
-	"iam/src/shared/domain/criteria"
+	domainCriteria "iam/src/shared/domain/criteria"
 	sharedCriteria "iam/src/shared/infrastructure/criteria"
+
+	"github.com/gin-gonic/gin"
 )
 
 // UserCriteriaBuilder construye criterios específicos para usuarios
 type UserCriteriaBuilder struct {
-	helper  *sharedCriteria.EntityCriteriaHelper
-	builder *criteria.CriteriaBuilder
+	*domainCriteria.CriteriaBuilder
+	helper *sharedCriteria.EntityCriteriaHelper
 }
 
 // NewUserCriteriaBuilder crea un nuevo builder para criterios de usuarios
 func NewUserCriteriaBuilder() *UserCriteriaBuilder {
 	return &UserCriteriaBuilder{
-		helper: sharedCriteria.NewEntityCriteriaHelper(),
+		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
+		helper:          sharedCriteria.NewEntityCriteriaHelper(),
 	}
 }
 
-// FromContext construye criterios desde el contexto de Gin
-func (b *UserCriteriaBuilder) FromContext(c *gin.Context) *UserCriteriaBuilder {
-	b.builder = b.helper.BuildBaseFromContext(c)
+// BuildFromContext construye criterios desde el contexto de Gin con filtro automático de tenant
+func (b *UserCriteriaBuilder) BuildFromContext(ctx *gin.Context) *UserCriteriaBuilder {
+	// Obtener tenant_id del header X-Tenant-ID y agregarlo automáticamente
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID != "" {
+		// Agregar tenant_id a los query parameters para el filtrado
+		query := ctx.Request.URL.Query()
+		query.Set("tenant_id", tenantID)
+		ctx.Request.URL.RawQuery = query.Encode()
+	}
 
-	// Filtros específicos de usuarios
-	b.builder.AddUUIDFilter("tenant_id", c.Query("tenant_id"))
-	b.builder.AddEqualFilter("status", c.Query("status"))
-	b.builder.AddUUIDFilter("role_id", c.Query("role_id"))
-	b.builder.AddLikeFilter("email", c.Query("email"))
-	b.builder.AddLikeFilter("first_name", c.Query("first_name"))
-	b.builder.AddLikeFilter("last_name", c.Query("last_name"))
-	b.builder.AddEqualFilter("provider", c.Query("provider"))
+	// Usar el helper para construir criterios base
+	b.CriteriaBuilder = b.helper.BuildBaseFromContext(ctx)
+
+	// Añadir filtros específicos de usuarios
+	b.AddTenantIDFilter(ctx.Query("tenant_id"))
+	b.AddEmailFilter(ctx.Query("email"))
+	b.AddFirstNameFilter(ctx.Query("first_name"))
+	b.AddLastNameFilter(ctx.Query("last_name"))
+	b.AddStatusFilter(ctx.Query("status"))
+	b.AddRoleIDFilter(ctx.Query("role_id"))
+	b.AddProviderFilter(ctx.Query("provider"))
 
 	return b
 }
 
-// Build construye los criterios finales
-func (b *UserCriteriaBuilder) Build() criteria.Criteria {
-	if b.builder == nil {
-		// Si no se ha inicializado desde contexto, crear builder vacío
-		b.builder = criteria.NewCriteriaBuilder()
+// BuildValidated construye criterios validados desde el contexto
+func (b *UserCriteriaBuilder) BuildValidated(ctx *gin.Context) domainCriteria.Criteria {
+	// Obtener tenant_id del header X-Tenant-ID y agregarlo automáticamente
+	tenantID := ctx.GetHeader("X-Tenant-ID")
+	if tenantID != "" {
+		// Agregar tenant_id a los query parameters para el filtrado
+		query := ctx.Request.URL.Query()
+		query.Set("tenant_id", tenantID)
+		ctx.Request.URL.RawQuery = query.Encode()
 	}
-	return b.builder.Build()
+
+	searchCriteria := b.BuildFromContext(ctx).Build()
+	return b.helper.ValidateAndSanitizeCriteria(searchCriteria, b.GetAllowedFields())
+}
+
+// FromURLValues inicializa el builder desde url.Values
+func (b *UserCriteriaBuilder) FromURLValues(values url.Values) *UserCriteriaBuilder {
+	// Construir criterios base
+	b.CriteriaBuilder = b.CriteriaBuilder.FromURLValues(values)
+
+	// Filtros específicos de usuarios
+	b.AddTenantIDFilter(values.Get("tenant_id"))
+	b.AddEmailFilter(values.Get("email"))
+	b.AddFirstNameFilter(values.Get("first_name"))
+	b.AddLastNameFilter(values.Get("last_name"))
+	b.AddStatusFilter(values.Get("status"))
+	b.AddRoleIDFilter(values.Get("role_id"))
+	b.AddProviderFilter(values.Get("provider"))
+
+	return b
+}
+
+// Métodos específicos para filtros de usuarios
+
+// AddTenantIDFilter añade filtro por tenant_id
+func (b *UserCriteriaBuilder) AddTenantIDFilter(tenantID string) *UserCriteriaBuilder {
+	if tenantID != "" {
+		b.CriteriaBuilder.AddUUIDFilter("tenant_id", tenantID)
+	}
+	return b
+}
+
+// AddEmailFilter añade filtro por email (búsqueda parcial)
+func (b *UserCriteriaBuilder) AddEmailFilter(email string) *UserCriteriaBuilder {
+	if email != "" {
+		b.CriteriaBuilder.AddLikeFilter("email", email)
+	}
+	return b
+}
+
+// AddFirstNameFilter añade filtro por first_name (búsqueda parcial)
+func (b *UserCriteriaBuilder) AddFirstNameFilter(firstName string) *UserCriteriaBuilder {
+	if firstName != "" {
+		b.CriteriaBuilder.AddLikeFilter("first_name", firstName)
+	}
+	return b
+}
+
+// AddLastNameFilter añade filtro por last_name (búsqueda parcial)
+func (b *UserCriteriaBuilder) AddLastNameFilter(lastName string) *UserCriteriaBuilder {
+	if lastName != "" {
+		b.CriteriaBuilder.AddLikeFilter("last_name", lastName)
+	}
+	return b
+}
+
+// AddStatusFilter añade filtro por status
+func (b *UserCriteriaBuilder) AddStatusFilter(status string) *UserCriteriaBuilder {
+	if status != "" {
+		b.CriteriaBuilder.AddEqualFilter("status", status)
+	}
+	return b
+}
+
+// AddRoleIDFilter añade filtro por role_id
+func (b *UserCriteriaBuilder) AddRoleIDFilter(roleID string) *UserCriteriaBuilder {
+	if roleID != "" {
+		b.CriteriaBuilder.AddUUIDFilter("role_id", roleID)
+	}
+	return b
+}
+
+// AddProviderFilter añade filtro por provider
+func (b *UserCriteriaBuilder) AddProviderFilter(provider string) *UserCriteriaBuilder {
+	if provider != "" {
+		b.CriteriaBuilder.AddEqualFilter("provider", provider)
+	}
+	return b
 }
 
 // GetAllowedFields retorna los campos permitidos para filtrado de usuarios
@@ -51,10 +145,4 @@ func (b *UserCriteriaBuilder) GetAllowedFields() []string {
 		"id", "email", "first_name", "last_name", "tenant_id",
 		"role_id", "status", "provider", "created_at", "updated_at",
 	}
-}
-
-// BuildValidated construye criterios validados desde el contexto
-func (b *UserCriteriaBuilder) BuildValidated(c *gin.Context) criteria.Criteria {
-	searchCriteria := b.FromContext(c).Build()
-	return b.helper.ValidateAndSanitizeCriteria(searchCriteria, b.GetAllowedFields())
 }

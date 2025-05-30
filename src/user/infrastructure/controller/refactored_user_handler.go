@@ -165,7 +165,8 @@ func (h *RefactoredUserHandler) UpdateUser(c *gin.Context) {
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param tenant_id query string false "Filter by tenant ID"
+// @Param X-Tenant-ID header string true "Tenant ID"
+// @Param tenant_id query string false "Filter by tenant ID (optional if header provided)"
 // @Param status query string false "Filter by user status (ACTIVE, INACTIVE, SUSPENDED, DELETED)"
 // @Param role_id query string false "Filter by role ID"
 // @Param email query string false "Filter by email (LIKE search)"
@@ -181,13 +182,25 @@ func (h *RefactoredUserHandler) UpdateUser(c *gin.Context) {
 // @Failure 500 {object} map[string]interface{}
 // @Router /users [get]
 func (h *RefactoredUserHandler) ListUsers(c *gin.Context) {
+	// Verificar que el header X-Tenant-ID esté presente
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+		return
+	}
+
+	// Agregar tenant_id a los query parameters para el filtrado automático
+	query := c.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	c.Request.URL.RawQuery = query.Encode()
+
 	// Construir criterios validados usando el builder específico
 	validCriteria := h.criteriaBuilder.BuildValidated(c)
 
 	// Ejecutar búsqueda usando el UseCase con criterios
 	result, err := h.listUsersByCriteriaUseCase.Execute(c.Request.Context(), validCriteria)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
 		return
 	}
 

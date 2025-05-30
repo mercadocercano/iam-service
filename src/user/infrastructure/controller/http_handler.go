@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,15 +9,16 @@ import (
 	"iam/src/user/application/request"
 	"iam/src/user/application/usecase"
 	"iam/src/user/domain/exception"
-	"iam/src/user/domain/value_object"
+	"iam/src/user/infrastructure/criteria"
 )
 
 type UserHandler struct {
-	createUserUseCase  *usecase.CreateUserUseCase
-	updateUserUseCase  *usecase.UpdateUserUseCase
-	getUserByIDUseCase *usecase.GetUserByIDUseCase
-	listUsersUseCase   *usecase.ListUsersUseCase
-	deleteUserUseCase  *usecase.DeleteUserUseCase
+	createUserUseCase          *usecase.CreateUserUseCase
+	updateUserUseCase          *usecase.UpdateUserUseCase
+	getUserByIDUseCase         *usecase.GetUserByIDUseCase
+	listUsersUseCase           *usecase.ListUsersUseCase
+	listUsersByCriteriaUseCase *usecase.ListUsersByCriteriaUseCase
+	deleteUserUseCase          *usecase.DeleteUserUseCase
 }
 
 func NewUserHandler(
@@ -26,14 +26,16 @@ func NewUserHandler(
 	updateUserUseCase *usecase.UpdateUserUseCase,
 	getUserByIDUseCase *usecase.GetUserByIDUseCase,
 	listUsersUseCase *usecase.ListUsersUseCase,
+	listUsersByCriteriaUseCase *usecase.ListUsersByCriteriaUseCase,
 	deleteUserUseCase *usecase.DeleteUserUseCase,
 ) *UserHandler {
 	return &UserHandler{
-		createUserUseCase:  createUserUseCase,
-		updateUserUseCase:  updateUserUseCase,
-		getUserByIDUseCase: getUserByIDUseCase,
-		listUsersUseCase:   listUsersUseCase,
-		deleteUserUseCase:  deleteUserUseCase,
+		createUserUseCase:          createUserUseCase,
+		updateUserUseCase:          updateUserUseCase,
+		getUserByIDUseCase:         getUserByIDUseCase,
+		listUsersUseCase:           listUsersUseCase,
+		listUsersByCriteriaUseCase: listUsersByCriteriaUseCase,
+		deleteUserUseCase:          deleteUserUseCase,
 	}
 }
 
@@ -157,61 +159,48 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 }
 
 // ListUsers godoc
-// @Summary List users
-// @Description List users with filtering and pagination
+// @Summary List users with advanced criteria
+// @Description List users with filtering, sorting and pagination using advanced criteria
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param tenant_id query string false "Tenant ID"
-// @Param status query string false "User status"
-// @Param role_id query string false "Role ID"
+// @Param X-Tenant-ID header string true "Tenant ID"
+// @Param tenant_id query string false "Tenant ID (optional if header provided)"
+// @Param email query string false "Filter by email (partial search)"
+// @Param first_name query string false "Filter by first name (partial search)"
+// @Param last_name query string false "Filter by last name (partial search)"
+// @Param status query string false "Filter by user status"
+// @Param role_id query string false "Filter by role ID"
+// @Param provider query string false "Filter by authentication provider"
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(10)
+// @Param sort_by query string false "Sort field" default("created_at")
+// @Param sort_dir query string false "Sort direction (asc/desc)" default("desc")
 // @Success 200 {object} response.UserListResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /users [get]
 func (h *UserHandler) ListUsers(c *gin.Context) {
-	params := &usecase.ListUsersParams{
-		Page:     1,
-		PageSize: 10,
+	// Verificar que el header X-Tenant-ID esté presente
+	tenantID := c.GetHeader("X-Tenant-ID")
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+		return
 	}
 
-	// Parse query parameters
-	if pageStr := c.Query("page"); pageStr != "" {
-		if page, err := strconv.Atoi(pageStr); err == nil && page > 0 {
-			params.Page = page
-		}
-	}
+	// Agregar tenant_id a los query parameters para el filtrado automático
+	query := c.Request.URL.Query()
+	query.Set("tenant_id", tenantID)
+	c.Request.URL.RawQuery = query.Encode()
 
-	if pageSizeStr := c.Query("page_size"); pageSizeStr != "" {
-		if pageSize, err := strconv.Atoi(pageSizeStr); err == nil && pageSize > 0 {
-			params.PageSize = pageSize
-		}
-	}
+	// Utilizar el criteria builder para construir los criterios desde la petición
+	criteriaBuilder := criteria.NewUserCriteriaBuilder()
+	crit := criteriaBuilder.BuildValidated(c)
 
-	if tenantIDStr := c.Query("tenant_id"); tenantIDStr != "" {
-		if tenantID, err := uuid.Parse(tenantIDStr); err == nil {
-			params.TenantID = &tenantID
-		}
-	}
-
-	if statusStr := c.Query("status"); statusStr != "" {
-		status := value_object.UserStatus(statusStr)
-		if status.IsValid() {
-			params.Status = &status
-		}
-	}
-
-	if roleIDStr := c.Query("role_id"); roleIDStr != "" {
-		if roleID, err := uuid.Parse(roleIDStr); err == nil {
-			params.RoleID = &roleID
-		}
-	}
-
-	users, err := h.listUsersUseCase.Execute(c.Request.Context(), params)
+	// Ejecutar el caso de uso para listar usuarios
+	users, err := h.listUsersByCriteriaUseCase.Execute(c.Request.Context(), crit)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
 		return
 	}
 

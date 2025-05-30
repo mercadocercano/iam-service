@@ -4,65 +4,49 @@ import (
 	"context"
 )
 
-// CriteriaRepository define la interfaz para repositorios que soporten búsqueda por criterios
+// CriteriaRepository define una interfaz genérica para repositorios que soportan criteria
 type CriteriaRepository[T any] interface {
-	// SearchByCriteria busca entidades según los criterios especificados
+	// SearchByCriteria busca entidades usando los criterios especificados
 	SearchByCriteria(ctx context.Context, criteria Criteria) ([]*T, error)
 
-	// CountByCriteria cuenta entidades según los criterios especificados (sin paginación)
+	// CountByCriteria cuenta las entidades que coinciden con los criterios
 	CountByCriteria(ctx context.Context, criteria Criteria) (int, error)
 }
 
-// ListRepository define operaciones básicas de listado
+// ListRepository define una interfaz para operaciones de listado con criteria
 type ListRepository[T any] interface {
-	// List obtiene todas las entidades con paginación
-	List(ctx context.Context, limit, offset int) ([]*T, error)
-
-	// Count obtiene el total de entidades
-	Count(ctx context.Context) (int, error)
-}
-
-// AdvancedCriteriaRepository combina ambas interfaces
-type AdvancedCriteriaRepository[T any] interface {
 	CriteriaRepository[T]
-	ListRepository[T]
+
+	// ListByCriteria combina búsqueda y conteo para generar respuesta de listado
+	ListByCriteria(ctx context.Context, criteria Criteria) (*ListResponse[T], error)
 }
 
-// ListResponse representa una respuesta paginada genérica
-type ListResponse[T any] struct {
-	Items      []*T `json:"items"`
-	TotalCount int  `json:"total_count"`
-	Page       int  `json:"page"`
-	PageSize   int  `json:"page_size"`
-	TotalPages int  `json:"total_pages"`
+// BaseListRepository implementación base que puede ser embebida por repositorios concretos
+type BaseListRepository[T any] struct {
+	criteriaRepo CriteriaRepository[T]
 }
 
-// NewListResponse crea una nueva respuesta de lista
-func NewListResponse[T any](items []*T, totalCount int, criteria Criteria) *ListResponse[T] {
-	page := criteria.Pagination.GetPage()
-	pageSize := criteria.Pagination.GetPageSize()
-	totalPages := (totalCount + pageSize - 1) / pageSize // Redondeo hacia arriba
-
-	return &ListResponse[T]{
-		Items:      items,
-		TotalCount: totalCount,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPages,
+// NewBaseListRepository crea una nueva instancia del repositorio base
+func NewBaseListRepository[T any](criteriaRepo CriteriaRepository[T]) *BaseListRepository[T] {
+	return &BaseListRepository[T]{
+		criteriaRepo: criteriaRepo,
 	}
 }
 
-// HasNextPage verifica si hay una página siguiente
-func (lr *ListResponse[T]) HasNextPage() bool {
-	return lr.Page < lr.TotalPages
-}
+// ListByCriteria implementa la lógica común para listado con criteria
+func (r *BaseListRepository[T]) ListByCriteria(ctx context.Context, criteria Criteria) (*ListResponse[T], error) {
+	// Obtener elementos
+	items, err := r.criteriaRepo.SearchByCriteria(ctx, criteria)
+	if err != nil {
+		return nil, err
+	}
 
-// HasPrevPage verifica si hay una página anterior
-func (lr *ListResponse[T]) HasPrevPage() bool {
-	return lr.Page > 1
-}
+	// Obtener conteo total
+	total, err := r.criteriaRepo.CountByCriteria(ctx, criteria)
+	if err != nil {
+		return nil, err
+	}
 
-// IsEmpty verifica si la respuesta está vacía
-func (lr *ListResponse[T]) IsEmpty() bool {
-	return len(lr.Items) == 0
+	// Crear respuesta
+	return NewListResponse(items, total, criteria), nil
 }

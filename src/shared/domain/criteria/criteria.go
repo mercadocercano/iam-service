@@ -1,34 +1,35 @@
 package criteria
 
-// Criteria representa un conjunto de criterios de filtrado, ordenación y paginación
+import (
+	"math"
+)
+
+// Criteria representa un conjunto de criterios para consultas
 type Criteria struct {
-	Filters    Filters
-	Order      Order
-	Pagination Pagination
+	Filters Filters
+	Order   Order
+	Limit   *int
+	Offset  *int
 }
 
-// NewCriteria crea una nueva instancia de Criteria
-func NewCriteria(filters Filters, order Order, pagination Pagination) Criteria {
+// NewCriteria crea un nuevo objeto Criteria
+func NewCriteria(filters Filters, order Order, limit, offset *int) Criteria {
 	return Criteria{
-		Filters:    filters,
-		Order:      order,
-		Pagination: pagination,
+		Filters: filters,
+		Order:   order,
+		Limit:   limit,
+		Offset:  offset,
 	}
 }
 
-// HasFilters retorna true si hay filtros definidos
-func (c *Criteria) HasFilters() bool {
-	return len(c.Filters.Items) > 0
+// IsEmpty verifica si el criteria está vacío
+func (c Criteria) IsEmpty() bool {
+	return len(c.Filters.Items) == 0 && c.Order.Field == "" && c.Limit == nil && c.Offset == nil
 }
 
-// HasOrder retorna true si hay ordenamiento definido
-func (c *Criteria) HasOrder() bool {
-	return c.Order.Field != ""
-}
-
-// HasPagination retorna true si hay paginación definida
-func (c *Criteria) HasPagination() bool {
-	return c.Pagination.Limit > 0
+// Filters representa una colección de filtros
+type Filters struct {
+	Items []Filter
 }
 
 // Filter representa un filtro individual
@@ -39,7 +40,7 @@ type Filter struct {
 }
 
 // NewFilter crea un nuevo filtro
-func NewFilter(field string, operator string, value interface{}) Filter {
+func NewFilter(field, operator string, value interface{}) Filter {
 	return Filter{
 		Field:    field,
 		Operator: operator,
@@ -47,16 +48,9 @@ func NewFilter(field string, operator string, value interface{}) Filter {
 	}
 }
 
-// Filters representa una colección de filtros
-type Filters struct {
-	Items []Filter
-}
-
-// NewFilters crea una nueva colección de filtros
-func NewFilters(items ...Filter) Filters {
-	return Filters{
-		Items: items,
-	}
+// NewFilters crea un conjunto de filtros
+func NewFilters(filters ...Filter) Filters {
+	return Filters{Items: filters}
 }
 
 // Add agrega un filtro a la colección
@@ -64,100 +58,137 @@ func (f *Filters) Add(filter Filter) {
 	f.Items = append(f.Items, filter)
 }
 
-// AddFilter agrega un filtro usando los parámetros individuales
-func (f *Filters) AddFilter(field, operator string, value interface{}) {
-	f.Add(NewFilter(field, operator, value))
+// Count retorna el número de filtros
+func (f Filters) Count() int {
+	return len(f.Items)
 }
 
-// HasField verifica si existe un filtro para el campo especificado
-func (f *Filters) HasField(field string) bool {
-	for _, filter := range f.Items {
-		if filter.Field == field {
-			return true
-		}
-	}
-	return false
+// IsEmpty verifica si no hay filtros
+func (f Filters) IsEmpty() bool {
+	return len(f.Items) == 0
 }
 
-// GetByField obtiene el primer filtro que coincida con el campo
-func (f *Filters) GetByField(field string) (*Filter, bool) {
-	for _, filter := range f.Items {
-		if filter.Field == field {
-			return &filter, true
-		}
-	}
-	return nil, false
-}
-
-// Order representa el criterio de ordenación
+// Order representa un orden para la consulta
 type Order struct {
 	Field     string
-	Direction string
+	OrderType OrderType
 }
 
-// NewOrder crea un nuevo criterio de ordenación
-func NewOrder(field string, direction string) Order {
+// OrderType representa el tipo de orden (ascendente o descendente)
+type OrderType string
+
+const (
+	// ASC representa un orden ascendente
+	ASC OrderType = "asc"
+	// DESC representa un orden descendente
+	DESC OrderType = "desc"
+)
+
+// NewOrder crea un nuevo orden
+func NewOrder(field string, orderType OrderType) Order {
 	return Order{
 		Field:     field,
-		Direction: direction,
+		OrderType: orderType,
 	}
 }
 
-// NewOrderAsc crea un ordenamiento ascendente
-func NewOrderAsc(field string) Order {
-	return NewOrder(field, "ASC")
-}
-
-// NewOrderDesc crea un ordenamiento descendente
-func NewOrderDesc(field string) Order {
-	return NewOrder(field, "DESC")
-}
-
-// IsValid verifica si el orden es válido
-func (o *Order) IsValid() bool {
-	return o.Field != "" && (o.Direction == "ASC" || o.Direction == "DESC")
+// IsEmpty verifica si el orden está vacío
+func (o Order) IsEmpty() bool {
+	return o.Field == ""
 }
 
 // Pagination representa los criterios de paginación
 type Pagination struct {
-	Limit  int
-	Offset int
+	Page     int
+	PageSize int
+	Limit    int
+	Offset   int
 }
 
 // NewPagination crea un nuevo criterio de paginación
-func NewPagination(limit int, offset int) Pagination {
-	return Pagination{
-		Limit:  limit,
-		Offset: offset,
-	}
-}
-
-// NewPaginationFromPage crea paginación basada en página y tamaño
-func NewPaginationFromPage(page, pageSize int) Pagination {
+func NewPagination(page, pageSize int) Pagination {
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 {
 		pageSize = 10
 	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
 	offset := (page - 1) * pageSize
-	return NewPagination(pageSize, offset)
+
+	return Pagination{
+		Page:     page,
+		PageSize: pageSize,
+		Limit:    pageSize,
+		Offset:   offset,
+	}
 }
 
-// GetPage calcula el número de página actual
-func (p *Pagination) GetPage() int {
-	if p.Limit <= 0 {
+// IsEmpty verifica si la paginación está vacía
+func (p Pagination) IsEmpty() bool {
+	return p.Limit == 0
+}
+
+// GetTotalPages calcula el número total de páginas
+func (p Pagination) GetTotalPages(totalCount int) int {
+	if p.PageSize == 0 {
+		return 0
+	}
+	return int(math.Ceil(float64(totalCount) / float64(p.PageSize)))
+}
+
+// GetPageFromOffset calcula la página basada en offset y tamaño de página
+func GetPageFromOffset(offset, pageSize int) int {
+	if pageSize == 0 {
 		return 1
 	}
-	return (p.Offset / p.Limit) + 1
+	return (offset / pageSize) + 1
 }
 
-// GetPageSize retorna el tamaño de página
-func (p *Pagination) GetPageSize() int {
-	return p.Limit
+// GetTotalPagesFromLimit calcula el número total de páginas basado en limit
+func GetTotalPagesFromLimit(totalCount, limit int) int {
+	if limit == 0 {
+		return 0
+	}
+	return int(math.Ceil(float64(totalCount) / float64(limit)))
 }
 
-// IsValid verifica si la paginación es válida
-func (p *Pagination) IsValid() bool {
-	return p.Limit > 0 && p.Offset >= 0
+// ListResponse representa una respuesta de listado genérica
+type ListResponse[T any] struct {
+	Items      []*T `json:"items"`
+	TotalCount int  `json:"total_count"`
+	Page       int  `json:"page"`
+	PageSize   int  `json:"page_size"`
+	TotalPages int  `json:"total_pages"`
+}
+
+// NewListResponse crea una nueva respuesta de listado
+func NewListResponse[T any](items []*T, totalCount int, criteria Criteria) *ListResponse[T] {
+	var page, pageSize, totalPages int
+
+	if criteria.Limit != nil {
+		pageSize = *criteria.Limit
+		totalPages = GetTotalPagesFromLimit(totalCount, pageSize)
+
+		if criteria.Offset != nil {
+			page = GetPageFromOffset(*criteria.Offset, pageSize)
+		} else {
+			page = 1
+		}
+	} else {
+		page = 1
+		pageSize = len(items)
+		totalPages = 1
+	}
+
+	return &ListResponse[T]{
+		Items:      items,
+		TotalCount: totalCount,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}
 }
