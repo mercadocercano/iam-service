@@ -1,6 +1,7 @@
 package value_object
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -44,4 +45,25 @@ func isValidEmail(email string) bool {
 	// Regex básica para validación de email
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	return emailRegex.MatchString(email)
+}
+
+// MarshalJSON implementa la serialización JSON para Email
+func (e Email) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.value)
+}
+
+// UnmarshalJSON implementa la deserialización JSON para Email
+func (e *Email) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+
+	email, err := NewEmail(value)
+	if err != nil {
+		return err
+	}
+
+	*e = *email
+	return nil
 }
