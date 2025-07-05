@@ -13,15 +13,19 @@ import (
 	"iam/src/plan/domain/exception"
 	"iam/src/plan/domain/port"
 	"iam/src/plan/domain/value_object"
+	"iam/src/shared/domain/criteria"
+	sharedCriteria "iam/src/shared/infrastructure/criteria"
 )
 
 type PostgresPlanRepository struct {
-	db *sql.DB
+	db        *sql.DB
+	converter *sharedCriteria.SQLCriteriaConverter
 }
 
-func NewPostgresPlanRepository(db *sql.DB) port.PlanRepository {
+func NewPostgresPlanRepository(db *sql.DB) port.PlanCriteriaRepository {
 	return &PostgresPlanRepository{
-		db: db,
+		db:        db,
+		converter: sharedCriteria.NewSQLCriteriaConverter(),
 	}
 }
 
@@ -341,4 +345,37 @@ func (r *PostgresPlanRepository) scanPlans(rows *sql.Rows) ([]*entity.Plan, erro
 	}
 
 	return plans, nil
+}
+
+// SearchByCriteria busca planes usando criterios
+func (r *PostgresPlanRepository) SearchByCriteria(ctx context.Context, crit criteria.Criteria) ([]*entity.Plan, error) {
+	baseQuery := `
+		SELECT id, name, description, type, status, max_users, price_month, price_year, features, created_at, updated_at
+		FROM plans
+	`
+
+	query, params := r.converter.ToSelectSQL(baseQuery, crit)
+
+	rows, err := r.db.QueryContext(ctx, query, params...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying plans by criteria: %w", err)
+	}
+	defer rows.Close()
+
+	return r.scanPlans(rows)
+}
+
+// CountByCriteria cuenta planes usando criterios
+func (r *PostgresPlanRepository) CountByCriteria(ctx context.Context, crit criteria.Criteria) (int, error) {
+	baseCountQuery := "SELECT COUNT(*) FROM plans"
+
+	query, params := r.converter.ToCountSQL(baseCountQuery, crit)
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, params...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting plans by criteria: %w", err)
+	}
+
+	return count, nil
 }

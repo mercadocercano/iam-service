@@ -7,6 +7,7 @@ import (
 
 	"iam/src/tenant/application/usecase"
 	"iam/src/tenant/infrastructure/controller"
+	"iam/src/tenant/infrastructure/criteria"
 	"iam/src/tenant/infrastructure/persistence/repository"
 )
 
@@ -22,9 +23,13 @@ func SetupTenantModule(apiGroup *gin.RouterGroup, db *sql.DB) *usecase.GetTenant
 	updateTenantUseCase := usecase.NewUpdateTenantUseCase(tenantRepo)
 	deleteTenantUseCase := usecase.NewDeleteTenantUseCase(tenantRepo)
 	listTenantsUseCase := usecase.NewListTenantsUseCase(tenantRepo)
+	listTenantsByCriteriaUseCase := usecase.NewListTenantsByCriteriaUseCase(tenantRepo)
 	setPlanUseCase := usecase.NewSetPlanUseCase(tenantRepo)
 	updateTenantFeaturesUseCase := usecase.NewUpdateTenantFeaturesUseCase(tenantRepo)
 	getTenantFeaturesUseCase := usecase.NewGetTenantFeaturesUseCase(tenantRepo)
+
+	// Crear criteria builder
+	tenantCriteriaBuilder := criteria.NewTenantCriteriaBuilder()
 
 	// Configurar controlador HTTP
 	tenantHandler := controller.NewTenantHandler(
@@ -34,8 +39,10 @@ func SetupTenantModule(apiGroup *gin.RouterGroup, db *sql.DB) *usecase.GetTenant
 		updateTenantUseCase,
 		deleteTenantUseCase,
 		listTenantsUseCase,
+		listTenantsByCriteriaUseCase,
 		setPlanUseCase,
 		updateTenantFeaturesUseCase,
+		tenantCriteriaBuilder,
 	)
 
 	// Registrar rutas HTTP

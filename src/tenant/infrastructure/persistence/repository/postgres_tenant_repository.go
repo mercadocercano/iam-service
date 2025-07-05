@@ -14,15 +14,19 @@ import (
 	"iam/src/tenant/domain/exception"
 	"iam/src/tenant/domain/port"
 	"iam/src/tenant/domain/value_object"
+	"iam/src/shared/domain/criteria"
+	sharedCriteria "iam/src/shared/infrastructure/criteria"
 )
 
 type PostgresTenantRepository struct {
-	db *sql.DB
+	db        *sql.DB
+	converter *sharedCriteria.SQLCriteriaConverter
 }
 
-func NewPostgresTenantRepository(db *sql.DB) port.TenantRepository {
+func NewPostgresTenantRepository(db *sql.DB) port.TenantCriteriaRepository {
 	return &PostgresTenantRepository{
-		db: db,
+		db:        db,
+		converter: sharedCriteria.NewSQLCriteriaConverter(),
 	}
 }
 
@@ -608,4 +612,39 @@ func (r *PostgresTenantRepository) scanTenants(rows *sql.Rows) ([]*entity.Tenant
 	}
 
 	return tenants, nil
+}
+
+// SearchByCriteria busca tenants usando criterios
+func (r *PostgresTenantRepository) SearchByCriteria(ctx context.Context, crit criteria.Criteria) ([]*entity.Tenant, error) {
+	baseQuery := `
+		SELECT id, name, slug, description, type, status, owner_id, domain, 
+		       plan_id, user_count, max_users, settings, features, expires_at,
+		       created_at, updated_at
+		FROM tenants
+	`
+
+	query, params := r.converter.ToSelectSQL(baseQuery, crit)
+
+	rows, err := r.db.QueryContext(ctx, query, params...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying tenants by criteria: %w", err)
+	}
+	defer rows.Close()
+
+	return r.scanTenants(rows)
+}
+
+// CountByCriteria cuenta tenants usando criterios
+func (r *PostgresTenantRepository) CountByCriteria(ctx context.Context, crit criteria.Criteria) (int, error) {
+	baseCountQuery := "SELECT COUNT(*) FROM tenants"
+
+	query, params := r.converter.ToCountSQL(baseCountQuery, crit)
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, params...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting tenants by criteria: %w", err)
+	}
+
+	return count, nil
 }

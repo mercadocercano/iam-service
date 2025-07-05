@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,6 +9,7 @@ import (
 	"iam/src/role/application/request"
 	"iam/src/role/application/usecase"
 	"iam/src/role/domain/exception"
+	"iam/src/role/infrastructure/criteria"
 )
 
 type RoleHandler struct {
@@ -18,6 +18,8 @@ type RoleHandler struct {
 	updateRoleUseCase  *usecase.UpdateRoleUseCase
 	deleteRoleUseCase  *usecase.DeleteRoleUseCase
 	listRolesUseCase   *usecase.ListRolesUseCase
+	listRolesByCriteriaUseCase *usecase.ListRolesByCriteriaUseCase
+	criteriaBuilder    *criteria.RoleCriteriaBuilder
 }
 
 func NewRoleHandler(
@@ -26,6 +28,8 @@ func NewRoleHandler(
 	updateRoleUseCase *usecase.UpdateRoleUseCase,
 	deleteRoleUseCase *usecase.DeleteRoleUseCase,
 	listRolesUseCase *usecase.ListRolesUseCase,
+	listRolesByCriteriaUseCase *usecase.ListRolesByCriteriaUseCase,
+	criteriaBuilder *criteria.RoleCriteriaBuilder,
 ) *RoleHandler {
 	return &RoleHandler{
 		createRoleUseCase:  createRoleUseCase,
@@ -33,6 +37,8 @@ func NewRoleHandler(
 		updateRoleUseCase:  updateRoleUseCase,
 		deleteRoleUseCase:  deleteRoleUseCase,
 		listRolesUseCase:   listRolesUseCase,
+		listRolesByCriteriaUseCase: listRolesByCriteriaUseCase,
+		criteriaBuilder:    criteriaBuilder,
 	}
 }
 
@@ -142,55 +148,11 @@ func (h *RoleHandler) DeleteRole(c *gin.Context) {
 
 // GET /roles
 func (h *RoleHandler) ListRoles(c *gin.Context) {
-	// Parámetros de paginación
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "10")
+	// Construir criterios desde los query params
+	criteria := h.criteriaBuilder.BuildValidated(c)
 
-	// Filtros
-	tenantIDStr := c.Query("tenant_id")
-	systemOnly := c.Query("system") == "true"
-	activeOnly := c.Query("active") == "true"
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	pageSize, err := strconv.Atoi(pageSizeStr)
-	if err != nil || pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-
-	var response interface{}
-
-	// Filtrar por roles de sistema
-	if systemOnly {
-		response, err = h.listRolesUseCase.GetSystemRoles(c.Request.Context())
-	} else if tenantIDStr != "" {
-		// Filtrar por tenant
-		tenantID, parseErr := uuid.Parse(tenantIDStr)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
-			return
-		}
-		response, err = h.listRolesUseCase.GetByTenant(c.Request.Context(), tenantID, page, pageSize)
-	} else if activeOnly {
-		// Filtrar solo activos
-		var tenantID *uuid.UUID
-		if tenantIDStr != "" {
-			tid, parseErr := uuid.Parse(tenantIDStr)
-			if parseErr != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
-				return
-			}
-			tenantID = &tid
-		}
-		response, err = h.listRolesUseCase.GetActiveRoles(c.Request.Context(), tenantID, page, pageSize)
-	} else {
-		// Lista general con paginación
-		response, err = h.listRolesUseCase.Execute(c.Request.Context(), page, pageSize)
-	}
-
+	// Ejecutar la búsqueda con criterios
+	response, err := h.listRolesByCriteriaUseCase.Execute(c.Request.Context(), criteria)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

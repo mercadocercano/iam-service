@@ -7,6 +7,7 @@ import (
 
 	"iam/src/role/application/usecase"
 	"iam/src/role/infrastructure/controller"
+	"iam/src/role/infrastructure/criteria"
 	"iam/src/role/infrastructure/persistence/repository"
 )
 
@@ -21,6 +22,10 @@ func SetupRoleModule(apiGroup *gin.RouterGroup, db *sql.DB) {
 	updateRoleUseCase := usecase.NewUpdateRoleUseCase(roleRepo)
 	deleteRoleUseCase := usecase.NewDeleteRoleUseCase(roleRepo)
 	listRolesUseCase := usecase.NewListRolesUseCase(roleRepo)
+	listRolesByCriteriaUseCase := usecase.NewListRolesByCriteriaUseCase(roleRepo)
+
+	// Crear criteria builder
+	criteriaBuilder := criteria.NewRoleCriteriaBuilder()
 
 	// Configurar controlador HTTP
 	roleHandler := controller.NewRoleHandler(
@@ -29,6 +34,8 @@ func SetupRoleModule(apiGroup *gin.RouterGroup, db *sql.DB) {
 		updateRoleUseCase,
 		deleteRoleUseCase,
 		listRolesUseCase,
+		listRolesByCriteriaUseCase,
+		criteriaBuilder,
 	)
 
 	// Registrar rutas HTTP

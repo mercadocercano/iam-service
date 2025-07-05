@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,23 +9,30 @@ import (
 	"iam/src/plan/application/request"
 	"iam/src/plan/application/usecase"
 	"iam/src/plan/domain/exception"
+	"iam/src/plan/infrastructure/criteria"
 )
 
 type PlanHandler struct {
 	createPlanUseCase  *usecase.CreatePlanUseCase
 	getPlanByIDUseCase *usecase.GetPlanByIDUseCase
 	listPlansUseCase   *usecase.ListPlansUseCase
+	listPlansByCriteriaUseCase *usecase.ListPlansByCriteriaUseCase
+	criteriaBuilder    *criteria.PlanCriteriaBuilder
 }
 
 func NewPlanHandler(
 	createPlanUseCase *usecase.CreatePlanUseCase,
 	getPlanByIDUseCase *usecase.GetPlanByIDUseCase,
 	listPlansUseCase *usecase.ListPlansUseCase,
+	listPlansByCriteriaUseCase *usecase.ListPlansByCriteriaUseCase,
+	criteriaBuilder *criteria.PlanCriteriaBuilder,
 ) *PlanHandler {
 	return &PlanHandler{
 		createPlanUseCase:  createPlanUseCase,
 		getPlanByIDUseCase: getPlanByIDUseCase,
 		listPlansUseCase:   listPlansUseCase,
+		listPlansByCriteriaUseCase: listPlansByCriteriaUseCase,
+		criteriaBuilder:    criteriaBuilder,
 	}
 }
 
@@ -78,28 +84,11 @@ func (h *PlanHandler) GetPlanByID(c *gin.Context) {
 
 // GET /plans
 func (h *PlanHandler) ListPlans(c *gin.Context) {
-	// Parámetros de paginación
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "10")
-	activeOnly := c.Query("active") == "true"
+	// Construir criterios desde los query params
+	criteria := h.criteriaBuilder.BuildValidated(c)
 
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	pageSize, err := strconv.Atoi(pageSizeStr)
-	if err != nil || pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-
-	var response interface{}
-	if activeOnly {
-		response, err = h.listPlansUseCase.GetActive(c.Request.Context())
-	} else {
-		response, err = h.listPlansUseCase.Execute(c.Request.Context(), page, pageSize)
-	}
-
+	// Ejecutar la búsqueda con criterios
+	response, err := h.listPlansByCriteriaUseCase.Execute(c.Request.Context(), criteria)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

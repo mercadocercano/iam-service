@@ -13,15 +13,19 @@ import (
 	"iam/src/role/domain/exception"
 	"iam/src/role/domain/port"
 	"iam/src/role/domain/value_object"
+	"iam/src/shared/domain/criteria"
+	sharedCriteria "iam/src/shared/infrastructure/criteria"
 )
 
 type PostgresRoleRepository struct {
-	db *sql.DB
+	db        *sql.DB
+	converter *sharedCriteria.SQLCriteriaConverter
 }
 
-func NewPostgresRoleRepository(db *sql.DB) port.RoleRepository {
+func NewPostgresRoleRepository(db *sql.DB) port.RoleCriteriaRepository {
 	return &PostgresRoleRepository{
-		db: db,
+		db:        db,
+		converter: sharedCriteria.NewSQLCriteriaConverter(),
 	}
 }
 
@@ -390,4 +394,37 @@ func (r *PostgresRoleRepository) scanRoles(rows *sql.Rows) ([]*entity.Role, erro
 	}
 
 	return roles, nil
+}
+
+// SearchByCriteria busca roles usando criterios
+func (r *PostgresRoleRepository) SearchByCriteria(ctx context.Context, crit criteria.Criteria) ([]*entity.Role, error) {
+	baseQuery := `
+		SELECT id, name, description, type, tenant_id, permissions, is_active, created_at, updated_at
+		FROM roles
+	`
+
+	query, params := r.converter.ToSelectSQL(baseQuery, crit)
+
+	rows, err := r.db.QueryContext(ctx, query, params...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying roles by criteria: %w", err)
+	}
+	defer rows.Close()
+
+	return r.scanRoles(rows)
+}
+
+// CountByCriteria cuenta roles usando criterios
+func (r *PostgresRoleRepository) CountByCriteria(ctx context.Context, crit criteria.Criteria) (int, error) {
+	baseCountQuery := "SELECT COUNT(*) FROM roles"
+
+	query, params := r.converter.ToCountSQL(baseCountQuery, crit)
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, params...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting roles by criteria: %w", err)
+	}
+
+	return count, nil
 }

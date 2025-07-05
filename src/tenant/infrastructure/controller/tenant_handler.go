@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -10,7 +9,7 @@ import (
 	"iam/src/tenant/application/request"
 	"iam/src/tenant/application/usecase"
 	"iam/src/tenant/domain/exception"
-	"iam/src/tenant/domain/value_object"
+	"iam/src/tenant/infrastructure/criteria"
 )
 
 type TenantHandler struct {
@@ -20,8 +19,10 @@ type TenantHandler struct {
 	updateTenantUseCase         *usecase.UpdateTenantUseCase
 	deleteTenantUseCase         *usecase.DeleteTenantUseCase
 	listTenantsUseCase          *usecase.ListTenantsUseCase
+	listTenantsByCriteriaUseCase *usecase.ListTenantsByCriteriaUseCase
 	setPlanUseCase              *usecase.SetPlanUseCase
 	updateTenantFeaturesUseCase *usecase.UpdateTenantFeaturesUseCase
+	criteriaBuilder             *criteria.TenantCriteriaBuilder
 }
 
 func NewTenantHandler(
@@ -31,8 +32,10 @@ func NewTenantHandler(
 	updateTenantUseCase *usecase.UpdateTenantUseCase,
 	deleteTenantUseCase *usecase.DeleteTenantUseCase,
 	listTenantsUseCase *usecase.ListTenantsUseCase,
+	listTenantsByCriteriaUseCase *usecase.ListTenantsByCriteriaUseCase,
 	setPlanUseCase *usecase.SetPlanUseCase,
 	updateTenantFeaturesUseCase *usecase.UpdateTenantFeaturesUseCase,
+	criteriaBuilder *criteria.TenantCriteriaBuilder,
 ) *TenantHandler {
 	return &TenantHandler{
 		createTenantUseCase:         createTenantUseCase,
@@ -41,8 +44,10 @@ func NewTenantHandler(
 		updateTenantUseCase:         updateTenantUseCase,
 		deleteTenantUseCase:         deleteTenantUseCase,
 		listTenantsUseCase:          listTenantsUseCase,
+		listTenantsByCriteriaUseCase: listTenantsByCriteriaUseCase,
 		setPlanUseCase:              setPlanUseCase,
 		updateTenantFeaturesUseCase: updateTenantFeaturesUseCase,
+		criteriaBuilder:             criteriaBuilder,
 	}
 }
 
@@ -179,72 +184,32 @@ func (h *TenantHandler) DeleteTenant(c *gin.Context) {
 
 // GET /tenants
 func (h *TenantHandler) ListTenants(c *gin.Context) {
-	// Parámetros de paginación
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "10")
+	// Usar el patrón criteria para manejar todos los filtros, ordenamiento y paginación
+	validCriteria := h.criteriaBuilder.BuildValidated(c)
 
-	// Filtros
-	ownerIDStr := c.Query("owner_id")
-	statusStr := c.Query("status")
-	typeStr := c.Query("type")
-	activeOnly := c.Query("active") == "true"
-	expiringDaysStr := c.Query("expiring_days")
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		page = 1
-	}
-
-	pageSize, err := strconv.Atoi(pageSizeStr)
-	if err != nil || pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-
-	var response interface{}
-
-	// Filtrar por owner
-	if ownerIDStr != "" {
-		ownerID, parseErr := uuid.Parse(ownerIDStr)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid owner ID"})
-			return
-		}
-		response, err = h.listTenantsUseCase.GetByOwner(c.Request.Context(), ownerID)
-	} else if statusStr != "" {
-		// Filtrar por status
-		status, parseErr := value_object.NewTenantStatusFromString(statusStr)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant status"})
-			return
-		}
-		response, err = h.listTenantsUseCase.GetByStatus(c.Request.Context(), status, page, pageSize)
-	} else if typeStr != "" {
-		// Filtrar por tipo
-		tenantType, parseErr := value_object.NewTenantTypeFromString(typeStr)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant type"})
-			return
-		}
-		response, err = h.listTenantsUseCase.GetByType(c.Request.Context(), tenantType, page, pageSize)
-	} else if activeOnly {
-		// Filtrar solo activos
-		response, err = h.listTenantsUseCase.GetActive(c.Request.Context(), page, pageSize)
-	} else if expiringDaysStr != "" {
-		// Filtrar por próximos a expirar
-		days, parseErr := strconv.Atoi(expiringDaysStr)
-		if parseErr != nil || days < 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid expiring days"})
-			return
-		}
-		response, err = h.listTenantsUseCase.GetExpiring(c.Request.Context(), days)
-	} else {
-		// Lista general con paginación
-		response, err = h.listTenantsUseCase.Execute(c.Request.Context(), page, pageSize)
-	}
-
+	// Ejecutar búsqueda usando el UseCase con criteria
+	result, err := h.listTenantsByCriteriaUseCase.Execute(c.Request.Context(), validCriteria)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
 		return
+	}
+
+	// Transformar el resultado al formato esperado por el frontend
+	// El frontend espera {tenants: [...], total_count: N, page: N, ...}
+	response := gin.H{
+		"tenants":     result.Items,
+		"total_count": result.TotalCount,
+		"page":        result.Page,
+		"page_size":   result.PageSize,
+		"total_pages": result.TotalPages,
+		"pagination": gin.H{
+			"offset":      (result.Page - 1) * result.PageSize,
+			"limit":       result.PageSize,
+			"total":       result.TotalCount,
+			"has_next":    result.Page < result.TotalPages,
+			"has_prev":    result.Page > 1,
+			"total_pages": result.TotalPages,
+		},
 	}
 
 	c.JSON(http.StatusOK, response)
