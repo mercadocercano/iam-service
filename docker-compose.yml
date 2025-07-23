@@ -1,10 +1,13 @@
 version: '3.8'
 
+# Docker Compose para IAM Service independiente
+# Usa la misma red y configuración que el docker-compose.infra.yml principal
+
 services:
-  # PostgreSQL for iam service
+  # PostgreSQL (referencia al servicio principal)
   postgres:
     image: postgres:15-alpine
-    container_name: iam-postgres
+    container_name: tv-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -20,14 +23,15 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - iam-network
+      - saas-network
 
-  # iam Service
+  # IAM Service
   iam-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: iam-service
+      target: development
+    container_name: tv-iam-service
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -35,17 +39,29 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: iam_db
       DB_SSLMODE: disable
+      GIN_MODE: debug
+      LOG_LEVEL: debug
+      JWT_SECRET: dev-secret-key-123
+      PORT: 8080
     ports:
       - "8080:8080"
+    volumes:
+      - .:/app
+      - iam_go_mod_cache:/go/pkg/mod
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - iam-network
+      - saas-network
+    labels:
+      - "dev.service=iam"
 
 volumes:
   postgres_data:
+    driver: local
+  iam_go_mod_cache:
+    driver: local
 
 networks:
-  iam-network:
+  saas-network:
     driver: bridge
