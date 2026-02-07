@@ -3,9 +3,9 @@ FROM golang:1.24-alpine
 
 WORKDIR /app
 
-# Instalar dependencias del sistema y air para hot reload
+# Instalar dependencias del sistema y air para hot reload (versión compatible)
 RUN apk add --no-cache git curl postgresql-client && \
-    go install github.com/air-verse/air@latest
+    go install github.com/air-verse/air@v1.61.5
 
 # Copiar archivos de proyecto
 COPY go.mod go.sum ./
