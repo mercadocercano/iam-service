@@ -10,8 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 
-	"iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
+	"github.com/mercadocercano/criteria"
 	"iam/src/user/domain/entity"
 	"iam/src/user/domain/exception"
 	"iam/src/user/domain/port"
@@ -20,13 +19,13 @@ import (
 
 type PostgresUserRepository struct {
 	db        *sql.DB
-	converter *sharedCriteria.SQLCriteriaConverter
+	converter *criteria.SQLCriteriaConverter
 }
 
 func NewPostgresUserRepository(db *sql.DB) port.UserCriteriaRepository {
 	return &PostgresUserRepository{
 		db:        db,
-		converter: sharedCriteria.NewSQLCriteriaConverter(),
+		converter: criteria.NewSQLCriteriaConverter(),
 	}
 }
 

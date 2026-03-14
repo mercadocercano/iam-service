@@ -13,19 +13,18 @@ import (
 	"iam/src/plan/domain/exception"
 	"iam/src/plan/domain/port"
 	"iam/src/plan/domain/value_object"
-	"iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
+	"github.com/mercadocercano/criteria"
 )
 
 type PostgresPlanRepository struct {
 	db        *sql.DB
-	converter *sharedCriteria.SQLCriteriaConverter
+	converter *criteria.SQLCriteriaConverter
 }
 
 func NewPostgresPlanRepository(db *sql.DB) port.PlanCriteriaRepository {
 	return &PostgresPlanRepository{
 		db:        db,
-		converter: sharedCriteria.NewSQLCriteriaConverter(),
+		converter: criteria.NewSQLCriteriaConverter(),
 	}
 }
 

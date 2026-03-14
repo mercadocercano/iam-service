@@ -2,21 +2,19 @@ package criteria
 
 import (
 	"github.com/gin-gonic/gin"
-
-	"iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
+	crit "github.com/mercadocercano/criteria"
 )
 
 // TenantCriteriaBuilder construye criterios específicos para tenants
 type TenantCriteriaBuilder struct {
-	helper  *sharedCriteria.EntityCriteriaHelper
-	builder *criteria.CriteriaBuilder
+	helper  *crit.EntityCriteriaHelper
+	builder *crit.CriteriaBuilder
 }
 
 // NewTenantCriteriaBuilder crea un nuevo builder para criterios de tenants
 func NewTenantCriteriaBuilder() *TenantCriteriaBuilder {
 	return &TenantCriteriaBuilder{
-		helper: sharedCriteria.NewEntityCriteriaHelper(),
+		helper: crit.NewEntityCriteriaHelper(),
 	}
 }
 
@@ -42,10 +40,9 @@ func (b *TenantCriteriaBuilder) FromContext(c *gin.Context) *TenantCriteriaBuild
 }
 
 // Build construye los criterios finales
-func (b *TenantCriteriaBuilder) Build() criteria.Criteria {
+func (b *TenantCriteriaBuilder) Build() crit.Criteria {
 	if b.builder == nil {
-		// Si no se ha inicializado desde contexto, crear builder vacío
-		b.builder = criteria.NewCriteriaBuilder()
+		b.builder = crit.NewCriteriaBuilder()
 	}
 	return b.builder.Build()
 }
@@ -59,7 +56,7 @@ func (b *TenantCriteriaBuilder) GetAllowedFields() []string {
 }
 
 // BuildValidated construye criterios validados desde el contexto
-func (b *TenantCriteriaBuilder) BuildValidated(c *gin.Context) criteria.Criteria {
+func (b *TenantCriteriaBuilder) BuildValidated(c *gin.Context) crit.Criteria {
 	searchCriteria := b.FromContext(c).Build()
 	return b.helper.ValidateAndSanitizeCriteria(searchCriteria, b.GetAllowedFields())
 }

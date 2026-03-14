@@ -14,19 +14,18 @@ import (
 	"iam/src/tenant/domain/exception"
 	"iam/src/tenant/domain/port"
 	"iam/src/tenant/domain/value_object"
-	"iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
+	"github.com/mercadocercano/criteria"
 )
 
 type PostgresTenantRepository struct {
 	db        *sql.DB
-	converter *sharedCriteria.SQLCriteriaConverter
+	converter *criteria.SQLCriteriaConverter
 }
 
 func NewPostgresTenantRepository(db *sql.DB) port.TenantCriteriaRepository {
 	return &PostgresTenantRepository{
 		db:        db,
-		converter: sharedCriteria.NewSQLCriteriaConverter(),
+		converter: criteria.NewSQLCriteriaConverter(),
 	}
 }
 

@@ -3,23 +3,21 @@ package criteria
 import (
 	"net/url"
 
-	domainCriteria "iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
-
 	"github.com/gin-gonic/gin"
+	crit "github.com/mercadocercano/criteria"
 )
 
 // UserCriteriaBuilder construye criterios específicos para usuarios
 type UserCriteriaBuilder struct {
-	*domainCriteria.CriteriaBuilder
-	helper *sharedCriteria.EntityCriteriaHelper
+	*crit.CriteriaBuilder
+	helper *crit.EntityCriteriaHelper
 }
 
 // NewUserCriteriaBuilder crea un nuevo builder para criterios de usuarios
 func NewUserCriteriaBuilder() *UserCriteriaBuilder {
 	return &UserCriteriaBuilder{
-		CriteriaBuilder: domainCriteria.NewCriteriaBuilder(),
-		helper:          sharedCriteria.NewEntityCriteriaHelper(),
+		CriteriaBuilder: crit.NewCriteriaBuilder(),
+		helper:          crit.NewEntityCriteriaHelper(),
 	}
 }
 
@@ -50,7 +48,7 @@ func (b *UserCriteriaBuilder) BuildFromContext(ctx *gin.Context) *UserCriteriaBu
 }
 
 // BuildValidated construye criterios validados desde el contexto
-func (b *UserCriteriaBuilder) BuildValidated(ctx *gin.Context) domainCriteria.Criteria {
+func (b *UserCriteriaBuilder) BuildValidated(ctx *gin.Context) crit.Criteria {
 	// Obtener tenant_id del header X-Tenant-ID y agregarlo automáticamente
 	tenantID := ctx.GetHeader("X-Tenant-ID")
 	if tenantID != "" {

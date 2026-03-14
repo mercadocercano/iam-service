@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"iam/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"iam/src/user/domain/entity"
 	"iam/src/user/domain/port"
 )
@@ -35,5 +35,5 @@ func (uc *ListUsersByCriteriaUseCase) Execute(ctx context.Context, searchCriteri
 	}
 
 	// Crear respuesta usando el helper genérico
-	return criteria.NewListResponse(users, total, searchCriteria), nil
+	return criteria.NewListResponseFromCriteria(users, total, searchCriteria), nil
 }

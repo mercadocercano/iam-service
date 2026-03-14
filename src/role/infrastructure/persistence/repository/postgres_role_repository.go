@@ -13,19 +13,18 @@ import (
 	"iam/src/role/domain/exception"
 	"iam/src/role/domain/port"
 	"iam/src/role/domain/value_object"
-	"iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
+	"github.com/mercadocercano/criteria"
 )
 
 type PostgresRoleRepository struct {
 	db        *sql.DB
-	converter *sharedCriteria.SQLCriteriaConverter
+	converter *criteria.SQLCriteriaConverter
 }
 
 func NewPostgresRoleRepository(db *sql.DB) port.RoleCriteriaRepository {
 	return &PostgresRoleRepository{
 		db:        db,
-		converter: sharedCriteria.NewSQLCriteriaConverter(),
+		converter: criteria.NewSQLCriteriaConverter(),
 	}
 }
 

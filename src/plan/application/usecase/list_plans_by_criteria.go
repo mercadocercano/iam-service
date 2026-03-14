@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"context"
-	"iam/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"iam/src/plan/domain/entity"
 	"iam/src/plan/domain/port"
 )
@@ -38,5 +38,5 @@ func (uc *ListPlansByCriteriaUseCase) Execute(ctx context.Context, searchCriteri
 	}
 
 	// Crear respuesta con información de paginación
-	return criteria.NewListResponse(plans, total, searchCriteria), nil
+	return criteria.NewListResponseFromCriteria(plans, total, searchCriteria), nil
 }

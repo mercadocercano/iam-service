@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"iam/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"iam/src/user/domain/entity"
 	"iam/src/user/domain/value_object"
 

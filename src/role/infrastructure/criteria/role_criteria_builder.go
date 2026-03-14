@@ -2,21 +2,19 @@ package criteria
 
 import (
 	"github.com/gin-gonic/gin"
-
-	"iam/src/shared/domain/criteria"
-	sharedCriteria "iam/src/shared/infrastructure/criteria"
+	crit "github.com/mercadocercano/criteria"
 )
 
 // RoleCriteriaBuilder construye criterios específicos para roles
 type RoleCriteriaBuilder struct {
-	helper  *sharedCriteria.EntityCriteriaHelper
-	builder *criteria.CriteriaBuilder
+	helper  *crit.EntityCriteriaHelper
+	builder *crit.CriteriaBuilder
 }
 
 // NewRoleCriteriaBuilder crea un nuevo builder para criterios de roles
 func NewRoleCriteriaBuilder() *RoleCriteriaBuilder {
 	return &RoleCriteriaBuilder{
-		helper: sharedCriteria.NewEntityCriteriaHelper(),
+		helper: crit.NewEntityCriteriaHelper(),
 	}
 }
 
@@ -43,10 +41,9 @@ func (b *RoleCriteriaBuilder) FromContext(c *gin.Context) *RoleCriteriaBuilder {
 }
 
 // Build construye los criterios finales
-func (b *RoleCriteriaBuilder) Build() criteria.Criteria {
+func (b *RoleCriteriaBuilder) Build() crit.Criteria {
 	if b.builder == nil {
-		// Si no se ha inicializado desde contexto, crear builder vacío
-		b.builder = criteria.NewCriteriaBuilder()
+		b.builder = crit.NewCriteriaBuilder()
 	}
 	return b.builder.Build()
 }
@@ -60,7 +57,7 @@ func (b *RoleCriteriaBuilder) GetAllowedFields() []string {
 }
 
 // BuildValidated construye criterios validados desde el contexto
-func (b *RoleCriteriaBuilder) BuildValidated(c *gin.Context) criteria.Criteria {
+func (b *RoleCriteriaBuilder) BuildValidated(c *gin.Context) crit.Criteria {
 	searchCriteria := b.FromContext(c).Build()
 	return b.helper.ValidateAndSanitizeCriteria(searchCriteria, b.GetAllowedFields())
 }

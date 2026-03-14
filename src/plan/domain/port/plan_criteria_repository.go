@@ -1,7 +1,7 @@
 package port
 
 import (
-	"iam/src/shared/domain/criteria"
+	"github.com/mercadocercano/criteria"
 	"iam/src/plan/domain/entity"
 )
 
