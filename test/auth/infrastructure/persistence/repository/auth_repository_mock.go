@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"iam/src/auth/domain/entity"
 	"iam/src/auth/domain/port"
@@ -27,6 +28,7 @@ type MockAuthRepository struct {
 	refreshTokens  map[string]*entity.RefreshToken
 	tokensByUser   map[uuid.UUID][]*entity.RefreshToken
 	federatedUsers map[string]port.UserData // key: provider:federatedID
+	revokedTokens  map[uuid.UUID]time.Time  // jti -> expiresAt
 	shouldFail     bool
 	failOnMethods  map[string]bool
 	callHistory    map[string]int
@@ -38,6 +40,7 @@ func NewMockAuthRepository() *MockAuthRepository {
 		refreshTokens:  make(map[string]*entity.RefreshToken),
 		tokensByUser:   make(map[uuid.UUID][]*entity.RefreshToken),
 		federatedUsers: make(map[string]port.UserData),
+		revokedTokens:  make(map[uuid.UUID]time.Time),
 		failOnMethods:  make(map[string]bool),
 		callHistory:    make(map[string]int),
 	}
@@ -237,6 +240,72 @@ func (r *MockAuthRepository) DeleteAllUserRefreshTokens(ctx context.Context, use
 	delete(r.tokensByUser, userID)
 
 	return nil
+}
+
+// RevokeToken implementa la interfaz del repositorio
+func (r *MockAuthRepository) RevokeToken(ctx context.Context, jti uuid.UUID, userID uuid.UUID, expiresAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.incrementCallCount("RevokeToken")
+
+	if r.shouldMethodFail("RevokeToken") {
+		return ErrMockFailedOp
+	}
+
+	r.revokedTokens[jti] = expiresAt
+	return nil
+}
+
+// IsTokenRevoked implementa la interfaz del repositorio
+func (r *MockAuthRepository) IsTokenRevoked(ctx context.Context, jti uuid.UUID) (bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	r.incrementCallCount("IsTokenRevoked")
+
+	if r.shouldMethodFail("IsTokenRevoked") {
+		return false, ErrMockFailedOp
+	}
+
+	_, exists := r.revokedTokens[jti]
+	return exists, nil
+}
+
+// RevokeAllUserTokens implementa la interfaz del repositorio
+func (r *MockAuthRepository) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID, expiresAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.incrementCallCount("RevokeAllUserTokens")
+
+	if r.shouldMethodFail("RevokeAllUserTokens") {
+		return ErrMockFailedOp
+	}
+
+	return nil
+}
+
+// CleanupExpiredRevocations implementa la interfaz del repositorio
+func (r *MockAuthRepository) CleanupExpiredRevocations(ctx context.Context) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.incrementCallCount("CleanupExpiredRevocations")
+
+	if r.shouldMethodFail("CleanupExpiredRevocations") {
+		return 0, ErrMockFailedOp
+	}
+
+	var count int64
+	now := time.Now()
+	for jti, expiresAt := range r.revokedTokens {
+		if expiresAt.Before(now) {
+			delete(r.revokedTokens, jti)
+			count++
+		}
+	}
+	return count, nil
 }
 
 // GetUserByFederatedID implementa la interfaz del repositorio

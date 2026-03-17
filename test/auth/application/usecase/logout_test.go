@@ -3,14 +3,25 @@ package usecase_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"iam/src/auth/application/usecase"
+	"iam/src/auth/domain/value_object"
 	authEntity "iam/test/auth/domain/entity"
 	"iam/test/auth/infrastructure/persistence/repository"
 )
+
+func newTestClaims(userID uuid.UUID, tenantID uuid.UUID) *value_object.TokenClaims {
+	return &value_object.TokenClaims{
+		JTI:       uuid.New(),
+		UserID:    userID,
+		TenantID:  tenantID,
+		ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
+	}
+}
 
 func TestLogoutUseCase_Execute(t *testing.T) {
 	// Arrange
@@ -25,6 +36,7 @@ func TestLogoutUseCase_Execute(t *testing.T) {
 		mockRepo.ResetCallHistory()
 
 		userID := uuid.New()
+		claims := newTestClaims(userID, uuid.New())
 
 		// Crear múltiples refresh tokens para el usuario
 		tokens := tokenMother.ForUser(userID, 3)
@@ -34,11 +46,12 @@ func TestLogoutUseCase_Execute(t *testing.T) {
 		assert.Equal(t, 3, mockRepo.GetTokenCountByUser(userID))
 
 		// Act
-		err := logoutUseCase.Execute(ctx, userID)
+		err := logoutUseCase.Execute(ctx, userID, claims)
 
 		// Assert
 		assert.NoError(t, err)
 		assert.Equal(t, 1, mockRepo.GetCallCount("DeleteAllUserRefreshTokens"))
+		assert.Equal(t, 1, mockRepo.GetCallCount("RevokeToken"))
 
 		// Verificar que todos los tokens del usuario fueron eliminados
 		assert.Equal(t, 0, mockRepo.GetTokenCountByUser(userID))
@@ -50,10 +63,9 @@ func TestLogoutUseCase_Execute(t *testing.T) {
 		mockRepo.ResetCallHistory()
 
 		userID := uuid.New()
-		// No configurar tokens para este usuario
 
 		// Act
-		err := logoutUseCase.Execute(ctx, userID)
+		err := logoutUseCase.Execute(ctx, userID, nil)
 
 		// Assert
 		assert.NoError(t, err)
@@ -69,7 +81,7 @@ func TestLogoutUseCase_Execute(t *testing.T) {
 		userID := uuid.New()
 
 		// Act
-		err := logoutUseCase.Execute(ctx, userID)
+		err := logoutUseCase.Execute(ctx, userID, nil)
 
 		// Assert
 		assert.Error(t, err)
@@ -96,7 +108,7 @@ func TestLogoutUseCase_Execute(t *testing.T) {
 		assert.Equal(t, 3, mockRepo.GetTokenCountByUser(user2ID))
 
 		// Act - Hacer logout solo del primer usuario
-		err := logoutUseCase.Execute(ctx, user1ID)
+		err := logoutUseCase.Execute(ctx, user1ID, nil)
 
 		// Assert
 		assert.NoError(t, err)
@@ -104,6 +116,6 @@ func TestLogoutUseCase_Execute(t *testing.T) {
 
 		// Verificar que solo los tokens del primer usuario fueron eliminados
 		assert.Equal(t, 0, mockRepo.GetTokenCountByUser(user1ID))
-		assert.Equal(t, 3, mockRepo.GetTokenCountByUser(user2ID)) // Tokens del segundo usuario intactos
+		assert.Equal(t, 3, mockRepo.GetTokenCountByUser(user2ID))
 	})
 }
