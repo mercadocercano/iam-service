@@ -10,6 +10,7 @@ import (
 
 type TokenClaims struct {
 	JTI       uuid.UUID                 `json:"jti"`
+	Issuer    string                    `json:"iss"`
 	UserID    uuid.UUID                 `json:"user_id"`
 	Email     string                    `json:"email"`
 	TenantID  uuid.UUID                 `json:"tenant_id"`
@@ -21,6 +22,7 @@ type TokenClaims struct {
 func NewTokenClaims(userID, tenantID, roleID uuid.UUID, email string, features *tenant_vo.TenantFeatures, expiresAt time.Time) *TokenClaims {
 	return &TokenClaims{
 		JTI:       uuid.New(),
+		Issuer:    "iam-service",
 		UserID:    userID,
 		Email:     email,
 		TenantID:  tenantID,
@@ -50,7 +52,7 @@ func (c TokenClaims) GetNotBefore() (*jwt.NumericDate, error) {
 }
 
 func (c TokenClaims) GetIssuer() (string, error) {
-	return "", nil
+	return c.Issuer, nil
 }
 
 func (c TokenClaims) GetSubject() (string, error) {
