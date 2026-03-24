@@ -67,7 +67,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, req *request.LoginRequest) 
 }
 
 func (uc *LoginUseCase) ExecuteWithInfo(ctx context.Context, req *request.LoginRequest, ipAddress, userAgent string) (*response.LoginResponse, error) {
-	log.Printf("[LOGIN] Iniciando proceso de login para email: %s, provider: %s", req.Email, req.Provider)
+	log.Printf("[LOGIN] Iniciando proceso de login, provider: %s", req.Provider)
 
 	if err := req.Validate(); err != nil {
 		log.Printf("[LOGIN] Error de validación de request: %v", err)
@@ -79,10 +79,10 @@ func (uc *LoginUseCase) ExecuteWithInfo(ctx context.Context, req *request.LoginR
 
 	switch req.Provider {
 	case value_object.LocalAuth:
-		log.Printf("[LOGIN] Procesando autenticación local para: %s", req.Email)
+		log.Printf("[LOGIN] Procesando autenticación local")
 		user, err = uc.loginLocal(ctx, req)
 	case value_object.GoogleAuth:
-		log.Printf("[LOGIN] Procesando autenticación Google para: %s", req.Email)
+		log.Printf("[LOGIN] Procesando autenticación Google")
 		user, err = uc.loginGoogle(ctx, req)
 	default:
 		log.Printf("[LOGIN] Proveedor no soportado: %s", req.Provider)
@@ -101,7 +101,7 @@ func (uc *LoginUseCase) ExecuteWithInfo(ctx context.Context, req *request.LoginR
 		return nil, err
 	}
 
-	log.Printf("[LOGIN] Autenticación exitosa para usuario ID: %s, email: %s", user.ID, user.Email)
+	log.Printf("[LOGIN] Autenticación exitosa para usuario ID: %s", user.ID)
 	uc.securityLogger.LogLoginSuccess(user.ID.String(), user.TenantID.String(), user.Email, ipAddress, userAgent)
 
 	// Generar tokens
@@ -117,7 +117,7 @@ func (uc *LoginUseCase) ExecuteWithInfo(ctx context.Context, req *request.LoginR
 		return nil, fmt.Errorf("error generando refresh token: %w", err)
 	}
 
-	log.Printf("[LOGIN] Tokens generados exitosamente para usuario: %s", user.Email)
+	log.Printf("[LOGIN] Tokens generados exitosamente para usuario ID: %s", user.ID)
 
 	userData := response.UserData{
 		ID:       user.ID,
@@ -131,40 +131,30 @@ func (uc *LoginUseCase) ExecuteWithInfo(ctx context.Context, req *request.LoginR
 }
 
 func (uc *LoginUseCase) loginLocal(ctx context.Context, req *request.LoginRequest) (*port.UserData, error) {
-	log.Printf("[LOGIN_LOCAL] Buscando usuario por email: %s", req.Email)
-
-	var tenantIDLog string
-	if req.TenantID != nil {
-		tenantIDLog = req.TenantID.String()
-	} else {
-		tenantIDLog = "nil"
-	}
-	log.Printf("[LOGIN_LOCAL] Tenant ID en request: %s", tenantIDLog)
+	log.Printf("[LOGIN_LOCAL] Buscando usuario por credenciales")
 
 	user, err := uc.userService.FindUserByEmail(ctx, req.Email, req.TenantID)
 	if err != nil {
-		log.Printf("[LOGIN_LOCAL] Usuario no encontrado para email: %s, error: %v", req.Email, err)
+		log.Printf("[LOGIN_LOCAL] Usuario no encontrado")
 		return nil, ErrInvalidCredentials
 	}
 
-	log.Printf("[LOGIN_LOCAL] Usuario encontrado - ID: %s, Email: %s, Provider: %s, Status: %s, TenantID: %s",
-		user.ID, user.Email, user.Provider, user.Status, user.TenantID)
+	log.Printf("[LOGIN_LOCAL] Usuario encontrado - ID: %s, Provider: %s, Status: %s, TenantID: %s",
+		user.ID, user.Provider, user.Status, user.TenantID)
 
 	if value_object.AuthProvider(user.Provider) != value_object.LocalAuth {
 		log.Printf("[LOGIN_LOCAL] Usuario usa proveedor diferente: %s (esperado: LOCAL)", user.Provider)
 		return nil, fmt.Errorf("este usuario usa autenticación %s", user.Provider)
 	}
 
-	log.Printf("[LOGIN_LOCAL] Verificando password para usuario: %s", user.Email)
-	log.Printf("[LOGIN_LOCAL] Password hash en BD: %s", user.PasswordHash)
-	log.Printf("[LOGIN_LOCAL] Password recibida: %s", req.Password)
+	log.Printf("[LOGIN_LOCAL] Verificando password para usuario ID: %s", user.ID)
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		log.Printf("[LOGIN_LOCAL] Password no coincide para usuario: %s, error bcrypt: %v", user.Email, err)
+		log.Printf("[LOGIN_LOCAL] Password no coincide para usuario ID: %s", user.ID)
 		return nil, ErrInvalidCredentials
 	}
 
-	log.Printf("[LOGIN_LOCAL] Password verificada correctamente para usuario: %s", user.Email)
+	log.Printf("[LOGIN_LOCAL] Password verificada correctamente para usuario ID: %s", user.ID)
 
 	// Validar tenant si se proporcionó
 	if req.TenantID != nil && *req.TenantID != user.TenantID {
@@ -172,7 +162,7 @@ func (uc *LoginUseCase) loginLocal(ctx context.Context, req *request.LoginReques
 		return nil, ErrInvalidCredentials
 	}
 
-	log.Printf("[LOGIN_LOCAL] Autenticación local exitosa para usuario: %s", user.Email)
+	log.Printf("[LOGIN_LOCAL] Autenticación local exitosa para usuario ID: %s", user.ID)
 	return user, nil
 }
 
