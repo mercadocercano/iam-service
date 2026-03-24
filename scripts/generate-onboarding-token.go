@@ -1,5 +1,8 @@
-// Genera un JWT para que onboarding-service llame a IAM (CreateTenant, CreateUser, GetRoleByType).
-// Uso: cd services/iam-service && go run scripts/generate-onboarding-token.go <JWT_SECRET>
+// DEPRECATED: onboarding-service ahora auto-genera su service token usando JWT_SECRET.
+// Este script solo es necesario como fallback si se quiere usar IAM_SUPER_ADMIN_TOKEN estático.
+// Ver: onboarding-service/src/onboarding/infrastructure/auth/service_token_provider.go
+//
+// Uso original: cd services/iam-service && go run scripts/generate-onboarding-token.go <JWT_SECRET>
 package main
 
 import (
