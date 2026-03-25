@@ -101,11 +101,7 @@ func SetupAuthModule(router *gin.RouterGroup, db *sql.DB, userService port.UserS
 		JWTSecret: config.JWTSecret,
 		AuthRepo:  authRepo,
 		ExcludedRoutes: []string{
-			"/api/v1/auth/login",
-			"/api/v1/auth/register",
-			"/api/v1/auth/google",
-			"/api/v1/auth/refresh",
-			"/api/v1/auth/validate",
+			"/api/v1/auth/*",
 		},
 	}))
 
