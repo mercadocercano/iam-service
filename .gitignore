@@ -41,3 +41,11 @@ coverage.out
 # Logs
 *.log
 logs/
+
+# Build artifacts
+tmp/
+.cache/
+.config/
+.gitconfig
+*-management/
+.cursorrules

@@ -102,7 +102,6 @@ func SetupAuthModule(router *gin.RouterGroup, db *sql.DB, userService port.UserS
 		AuthRepo:  authRepo,
 		ExcludedRoutes: []string{
 			"/api/v1/auth/*",
-			"/iam/api/v1/auth/*",
 		},
 	}))
 
