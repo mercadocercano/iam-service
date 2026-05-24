@@ -9,6 +9,7 @@ name: Deploy iam-service to Production
 on:
   push:
     branches: [main, master]
+  workflow_dispatch:
 
 env:
   REGISTRY: registry.digitalocean.com/mc-bootstrap-registry
