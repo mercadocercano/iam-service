@@ -26,20 +26,18 @@ func (b *PlanCriteriaBuilder) FromContext(c *gin.Context) *PlanCriteriaBuilder {
 	b.builder.AddEqualFilter("type", c.Query("type"))
 	b.builder.AddEqualFilter("status", c.Query("status"))
 	b.builder.AddLikeFilter("name", c.Query("name"))
-	b.builder.AddEqualFilter("currency", c.Query("currency"))
-
 	// Filtros especiales
 	if c.Query("active") == "true" {
 		b.builder.AddEqualFilter("status", "ACTIVE")
 	}
 
-	// Filtros de rango para precio
+	// Filtros de rango para precio (price_month)
 	if minPrice := c.Query("min_price"); minPrice != "" {
-		b.builder.AddFilter("price", crit.OpGreaterThanOrEqual, minPrice)
+		b.builder.AddFilter("price_month", crit.OpGreaterThanOrEqual, minPrice)
 	}
 
 	if maxPrice := c.Query("max_price"); maxPrice != "" {
-		b.builder.AddFilter("price", crit.OpLessThanOrEqual, maxPrice)
+		b.builder.AddFilter("price_month", crit.OpLessThanOrEqual, maxPrice)
 	}
 
 	return b
@@ -56,7 +54,7 @@ func (b *PlanCriteriaBuilder) Build() crit.Criteria {
 // GetAllowedFields retorna los campos permitidos para filtrado de planes
 func (b *PlanCriteriaBuilder) GetAllowedFields() []string {
 	return []string{
-		"id", "name", "description", "type", "price", "currency",
+		"id", "name", "description", "type", "price_month", "price_year",
 		"status", "created_at", "updated_at",
 	}
 }
