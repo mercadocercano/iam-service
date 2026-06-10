@@ -78,6 +78,7 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
