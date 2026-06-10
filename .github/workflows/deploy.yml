@@ -99,10 +99,11 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy@${{ secrets.DROPLET_IP }} \
             "export KUBECONFIG=/home/deploy/.kube/config && \
-             READY=\$(kubectl get pods -l app=iam-service -o jsonpath='{.items[0].status.containerStatuses[0].ready}') && \
-             IMAGE=\$(kubectl get pods -l app=iam-service -o jsonpath='{.items[0].spec.containers[0].image}') && \
-             echo \"Pod ready: \$READY\" && echo \"Image: \$IMAGE\" && \
-             [ \"\$READY\" = 'true' ] || (echo '❌ Pod not ready'; exit 1) && \
+             kubectl wait pod -l app=${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} \
+               --for=condition=ready --timeout=60s && \
+             IMAGE=\$(kubectl get pods -l app=${{ env.DEPLOYMENT_NAME }} -n ${{ env.NAMESPACE }} \
+               -o jsonpath='{.items[0].spec.containers[0].image}') && \
+             echo \"Image: \$IMAGE\" && \
              echo '✅ iam-service is running and healthy'"
 
 
