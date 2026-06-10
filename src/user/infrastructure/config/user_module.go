@@ -27,8 +27,8 @@ func SetupUserModule(router *gin.RouterGroup, db *sql.DB) service.UserFinderServ
 	// Crear el nuevo caso de uso de listado por criteria
 	listUsersByCriteriaUseCase := usecase.NewListUsersByCriteriaUseCase(userRepo)
 
-	// 3. Crear controlador HTTP refactorizado (que usa criteria)
-	userHandler := controller.NewRefactoredUserHandler(
+	// 3. Crear controlador HTTP
+	userHandler := controller.NewUserHandler(
 		createUserUseCase,
 		getUserUseCase,
 		updateUserUseCase,

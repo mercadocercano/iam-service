@@ -12,8 +12,8 @@ import (
 	userCriteria "iam/src/user/infrastructure/criteria"
 )
 
-// RefactoredUserHandler muestra cómo se vería el handler usando el nuevo sistema de criterios
-type RefactoredUserHandler struct {
+// UserHandler muestra cómo se vería el handler usando el nuevo sistema de criterios
+type UserHandler struct {
 	createUserUseCase          *usecase.CreateUserUseCase
 	getUserByIDUseCase         *usecase.GetUserByIDUseCase
 	updateUserUseCase          *usecase.UpdateUserUseCase
@@ -22,14 +22,14 @@ type RefactoredUserHandler struct {
 	criteriaBuilder            *userCriteria.UserCriteriaBuilder
 }
 
-func NewRefactoredUserHandler(
+func NewUserHandler(
 	createUserUseCase *usecase.CreateUserUseCase,
 	getUserByIDUseCase *usecase.GetUserByIDUseCase,
 	updateUserUseCase *usecase.UpdateUserUseCase,
 	deleteUserUseCase *usecase.DeleteUserUseCase,
 	listUsersByCriteriaUseCase *usecase.ListUsersByCriteriaUseCase,
-) *RefactoredUserHandler {
-	return &RefactoredUserHandler{
+) *UserHandler {
+	return &UserHandler{
 		createUserUseCase:          createUserUseCase,
 		getUserByIDUseCase:         getUserByIDUseCase,
 		updateUserUseCase:          updateUserUseCase,
@@ -51,7 +51,7 @@ func NewRefactoredUserHandler(
 // @Failure 409 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /users [post]
-func (h *RefactoredUserHandler) CreateUser(c *gin.Context) {
+func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req request.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos de entrada inválidos", "details": err.Error()})
@@ -88,7 +88,7 @@ func (h *RefactoredUserHandler) CreateUser(c *gin.Context) {
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /users/{id} [get]
-func (h *RefactoredUserHandler) GetUserByID(c *gin.Context) {
+func (h *UserHandler) GetUserByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -128,7 +128,7 @@ func (h *RefactoredUserHandler) GetUserByID(c *gin.Context) {
 // @Failure 409 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /users/{id} [put]
-func (h *RefactoredUserHandler) UpdateUser(c *gin.Context) {
+func (h *UserHandler) UpdateUser(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -194,7 +194,7 @@ func (h *RefactoredUserHandler) UpdateUser(c *gin.Context) {
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /users [get]
-func (h *RefactoredUserHandler) ListUsers(c *gin.Context) {
+func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Verificar que el header X-Tenant-ID esté presente
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
@@ -232,7 +232,7 @@ func (h *RefactoredUserHandler) ListUsers(c *gin.Context) {
 // @Failure 404 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /users/{id} [delete]
-func (h *RefactoredUserHandler) DeleteUser(c *gin.Context) {
+func (h *UserHandler) DeleteUser(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
@@ -263,7 +263,7 @@ func (h *RefactoredUserHandler) DeleteUser(c *gin.Context) {
 }
 
 // RegisterRoutes registra las rutas HTTP del módulo user refactorizado
-func (h *RefactoredUserHandler) RegisterRoutes(router *gin.RouterGroup) {
+func (h *UserHandler) RegisterRoutes(router *gin.RouterGroup) {
 	userGroup := router.Group("/users") // Usar ruta principal
 	{
 		userGroup.POST("", h.CreateUser)
