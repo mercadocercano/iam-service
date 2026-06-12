@@ -9,8 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	_ "github.com/lib/pq"
+	"github.com/hornosg/go-shared/infrastructure/env"
 	tenantmw "github.com/hornosg/go-shared/infrastructure/middleware"
+	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"iam/src/auth/infrastructure/adapter"
@@ -52,7 +53,7 @@ func main() {
 
 	// Validación de tenant (X-Tenant-ID vs JWT tenant_id)
 	securityLogger := sharedlog.NewSecurityLogger("iam")
-	serviceNamespace := getEnv("SERVICE_NAMESPACE", "mc")
+	serviceNamespace := env.Get("SERVICE_NAMESPACE", "mc")
 	router.Use(tenantmw.TenantValidation(tenantmw.TenantValidationConfig{
 		JWTSecret: os.Getenv("JWT_SECRET"),
 		Namespace: serviceNamespace,
@@ -146,7 +147,7 @@ func main() {
 	roleConfig.SetupRoleModule(apiV1, db)
 
 	// Iniciar el servidor
-	port := getEnv("PORT", "8080")
+	port := env.Get("PORT", "8080")
 	log.Printf("Starting IAM server on port %s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Error starting server: %v", err)
@@ -155,12 +156,12 @@ func main() {
 
 func setupDatabase() (*sql.DB, error) {
 	// Configuración de la base de datos desde variables de entorno
-	host := getEnv("DB_HOST", "localhost")
-	port := getEnv("DB_PORT", "5432")
-	user := getEnv("DB_USER", "postgres")
-	password := getEnv("DB_PASSWORD", "postgres")
-	dbname := getEnv("DB_NAME", "iam_db")
-	sslmode := getEnv("DB_SSLMODE", "disable")
+	host := env.Get("DB_HOST", "localhost")
+	port := env.Get("DB_PORT", "5432")
+	user := env.Get("DB_USER", "postgres")
+	password := env.Get("DB_PASSWORD", "postgres")
+	dbname := env.Get("DB_NAME", "iam_db")
+	sslmode := env.Get("DB_SSLMODE", "disable")
 
 	dsn := "host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + dbname + " sslmode=" + sslmode
 
@@ -176,11 +177,4 @@ func setupDatabase() (*sql.DB, error) {
 
 	log.Println("Successfully connected to database")
 	return db, nil
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
