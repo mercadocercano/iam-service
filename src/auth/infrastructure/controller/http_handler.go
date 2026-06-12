@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"iam/src/auth/application/request"
 	"iam/src/auth/application/usecase"
@@ -51,7 +52,7 @@ func NewAuthHandler(
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos de entrada inválidos", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Datos de entrada inválidos", err.Error())
 		return
 	}
 
@@ -61,11 +62,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case usecase.ErrInvalidCredentials:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales inválidas"})
+			httpresp.JSON(c, http.StatusUnauthorized, "Credenciales inválidas")
 		case usecase.ErrUserNotFound:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusUnauthorized, "Usuario no encontrado")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+			httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		}
 		return
 	}
@@ -91,7 +92,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Refresh token requerido"})
+		httpresp.JSON(c, http.StatusBadRequest, "Refresh token requerido")
 		return
 	}
 
@@ -99,13 +100,13 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case usecase.ErrInvalidToken:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token inválido"})
+			httpresp.JSON(c, http.StatusUnauthorized, "Refresh token inválido")
 		case usecase.ErrExpiredToken:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token expirado"})
+			httpresp.JSON(c, http.StatusUnauthorized, "Refresh token expirado")
 		case usecase.ErrUserNotFound:
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusUnauthorized, "Usuario no encontrado")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+			httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		}
 		return
 	}
@@ -128,20 +129,20 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 	// Extraer token del header Authorization
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token de autorización requerido"})
+		httpresp.JSON(c, http.StatusUnauthorized, "Token de autorización requerido")
 		return
 	}
 
 	// Verificar formato Bearer
 	tokenParts := strings.Split(authHeader, " ")
 	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Formato de token inválido"})
+		httpresp.JSON(c, http.StatusUnauthorized, "Formato de token inválido")
 		return
 	}
 
 	claims, err := h.validateTokenUseCase.Execute(tokenParts[1])
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusUnauthorized, "Token inválido", err.Error())
 		return
 	}
 
@@ -168,13 +169,13 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userIDValue, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+		httpresp.JSON(c, http.StatusUnauthorized, "Usuario no autenticado")
 		return
 	}
 
 	userID, ok := userIDValue.(uuid.UUID)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ID de usuario inválido"})
+		httpresp.JSON(c, http.StatusInternalServerError, "ID de usuario inválido")
 		return
 	}
 
@@ -188,7 +189,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	err := h.logoutUseCase.Execute(c.Request.Context(), userID, claims)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error cerrando sesión", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error cerrando sesión", err.Error())
 		return
 	}
 
@@ -199,19 +200,19 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) RevokeAll(c *gin.Context) {
 	userIDValue, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Usuario no autenticado"})
+		httpresp.JSON(c, http.StatusUnauthorized, "Usuario no autenticado")
 		return
 	}
 
 	userID, ok := userIDValue.(uuid.UUID)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ID de usuario inválido"})
+		httpresp.JSON(c, http.StatusInternalServerError, "ID de usuario inválido")
 		return
 	}
 
 	err := h.revokeAllUseCase.Execute(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error revocando tokens", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error revocando tokens", err.Error())
 		return
 	}
 

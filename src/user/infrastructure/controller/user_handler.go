@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"iam/src/user/application/request"
 	"iam/src/user/application/usecase"
@@ -54,7 +55,7 @@ func NewUserHandler(
 func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req request.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos de entrada inválidos", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Datos de entrada inválidos", err.Error())
 		return
 	}
 
@@ -62,13 +63,13 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrUserAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "El usuario ya existe"})
+			httpresp.JSON(c, http.StatusConflict, "El usuario ya existe")
 		case exception.ErrInvalidEmail:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Email inválido"})
+			httpresp.JSON(c, http.StatusBadRequest, "Email inválido")
 		case exception.ErrWeakPassword:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Contraseña muy débil"})
+			httpresp.JSON(c, http.StatusBadRequest, "Contraseña muy débil")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+			httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		}
 		return
 	}
@@ -92,22 +93,22 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de usuario inválido"})
+		httpresp.JSON(c, http.StatusBadRequest, "ID de usuario inválido")
 		return
 	}
 
 	user, err := h.getUserByIDUseCase.Execute(c.Request.Context(), id)
 	if err != nil {
 		if err == exception.ErrUserNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusNotFound, "Usuario no encontrado")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		return
 	}
 
 	if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" && user.TenantID.String() != tenantID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+		httpresp.JSON(c, http.StatusNotFound, "Usuario no encontrado")
 		return
 	}
 
@@ -132,13 +133,13 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de usuario inválido"})
+		httpresp.JSON(c, http.StatusBadRequest, "ID de usuario inválido")
 		return
 	}
 
 	var req request.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos de entrada inválidos", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusBadRequest, "Datos de entrada inválidos", err.Error())
 		return
 	}
 
@@ -147,7 +148,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" {
 		existing, err := h.getUserByIDUseCase.Execute(c.Request.Context(), id)
 		if err != nil || existing.TenantID.String() != tenantID {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusNotFound, "Usuario no encontrado")
 			return
 		}
 	}
@@ -156,15 +157,15 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrUserNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusNotFound, "Usuario no encontrado")
 		case exception.ErrUserAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "El email ya está en uso"})
+			httpresp.JSON(c, http.StatusConflict, "El email ya está en uso")
 		case exception.ErrInvalidEmail:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Email inválido"})
+			httpresp.JSON(c, http.StatusBadRequest, "Email inválido")
 		case exception.ErrInvalidStatus:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Estado inválido"})
+			httpresp.JSON(c, http.StatusBadRequest, "Estado inválido")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+			httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		}
 		return
 	}
@@ -198,7 +199,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Verificar que el header X-Tenant-ID esté presente
 	tenantID := c.GetHeader("X-Tenant-ID")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "X-Tenant-ID header es requerido"})
+		httpresp.JSON(c, http.StatusBadRequest, "X-Tenant-ID header es requerido")
 		return
 	}
 
@@ -213,7 +214,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	// Ejecutar búsqueda usando el UseCase con criterios
 	result, err := h.listUsersByCriteriaUseCase.Execute(c.Request.Context(), validCriteria)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		return
 	}
 
@@ -236,14 +237,14 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de usuario inválido"})
+		httpresp.JSON(c, http.StatusBadRequest, "ID de usuario inválido")
 		return
 	}
 
 	if tenantID := c.GetHeader("X-Tenant-ID"); tenantID != "" {
 		existing, err := h.getUserByIDUseCase.Execute(c.Request.Context(), id)
 		if err != nil || existing.TenantID.String() != tenantID {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusNotFound, "Usuario no encontrado")
 			return
 		}
 	}
@@ -252,9 +253,9 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrUserNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+			httpresp.JSON(c, http.StatusNotFound, "Usuario no encontrado")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+			httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		}
 		return
 	}

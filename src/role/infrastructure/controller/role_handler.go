@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"iam/src/role/application/request"
 	"iam/src/role/application/usecase"
@@ -46,7 +47,7 @@ func NewRoleHandler(
 func (h *RoleHandler) CreateRole(c *gin.Context) {
 	var req request.CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -54,13 +55,13 @@ func (h *RoleHandler) CreateRole(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrRoleAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "Role already exists"})
+			httpresp.JSON(c, http.StatusConflict, "Role already exists")
 		case exception.ErrInvalidRoleType:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role type"})
+			httpresp.JSON(c, http.StatusBadRequest, "Invalid role type")
 		case exception.ErrInvalidTenant:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant"})
+			httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -73,17 +74,17 @@ func (h *RoleHandler) GetRoleByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid role ID")
 		return
 	}
 
 	response, err := h.getRoleByIDUseCase.Execute(c.Request.Context(), id)
 	if err != nil {
 		if err == exception.ErrRoleNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Role not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -95,13 +96,13 @@ func (h *RoleHandler) UpdateRole(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid role ID")
 		return
 	}
 
 	var req request.UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -109,11 +110,11 @@ func (h *RoleHandler) UpdateRole(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrRoleNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Role not found")
 		case exception.ErrSystemRoleModification:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot modify system role"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot modify system role")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -126,7 +127,7 @@ func (h *RoleHandler) DeleteRole(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid role ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid role ID")
 		return
 	}
 
@@ -134,11 +135,11 @@ func (h *RoleHandler) DeleteRole(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrRoleNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Role not found")
 		case exception.ErrCannotDeleteRole:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete system role"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot delete system role")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -154,7 +155,7 @@ func (h *RoleHandler) ListRoles(c *gin.Context) {
 	// Ejecutar la búsqueda con criterios
 	response, err := h.listRolesByCriteriaUseCase.Execute(c.Request.Context(), criteria)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 

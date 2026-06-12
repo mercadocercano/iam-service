@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"iam/src/auth/domain/port"
 	"iam/src/auth/infrastructure/adapter"
@@ -59,9 +60,7 @@ func TokenRevocationCheck(cfg TokenRevocationConfig) gin.HandlerFunc {
 		if claims.JTI != uuid.Nil {
 			revoked, err := cfg.AuthRepo.IsTokenRevoked(c.Request.Context(), claims.JTI)
 			if err == nil && revoked {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"error": "Token has been revoked",
-				})
+				httpresp.Abort(c, http.StatusUnauthorized, "Token has been revoked")
 				return
 			}
 		}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"iam/src/plan/application/request"
 	"iam/src/plan/application/usecase"
@@ -40,7 +41,7 @@ func NewPlanHandler(
 func (h *PlanHandler) CreatePlan(c *gin.Context) {
 	var req request.CreatePlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -48,11 +49,11 @@ func (h *PlanHandler) CreatePlan(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrPlanAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "Plan already exists"})
+			httpresp.JSON(c, http.StatusConflict, "Plan already exists")
 		case exception.ErrInvalidPlanType:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan type"})
+			httpresp.JSON(c, http.StatusBadRequest, "Invalid plan type")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -65,17 +66,17 @@ func (h *PlanHandler) GetPlanByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid plan ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid plan ID")
 		return
 	}
 
 	response, err := h.getPlanByIDUseCase.Execute(c.Request.Context(), id)
 	if err != nil {
 		if err == exception.ErrPlanNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Plan not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Plan not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -90,7 +91,7 @@ func (h *PlanHandler) ListPlans(c *gin.Context) {
 	// Ejecutar la búsqueda con criterios
 	response, err := h.listPlansByCriteriaUseCase.Execute(c.Request.Context(), criteria)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 

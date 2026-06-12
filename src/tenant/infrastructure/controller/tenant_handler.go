@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	httpresp "github.com/hornosg/go-shared/infrastructure/response"
 
 	"iam/src/tenant/application/request"
 	"iam/src/tenant/application/usecase"
@@ -55,7 +56,7 @@ func NewTenantHandler(
 func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	var req request.CreateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -63,15 +64,15 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrSlugAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "Slug already exists"})
+			httpresp.JSON(c, http.StatusConflict, "Slug already exists")
 		case exception.ErrDomainAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "Domain already exists"})
+			httpresp.JSON(c, http.StatusConflict, "Domain already exists")
 		case exception.ErrInvalidTenantType:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant type"})
+			httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant type")
 		case exception.ErrInvalidOwner:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid owner"})
+			httpresp.JSON(c, http.StatusBadRequest, "Invalid owner")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -84,17 +85,17 @@ func (h *TenantHandler) GetTenantByID(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant ID")
 		return
 	}
 
 	response, err := h.getTenantByIDUseCase.Execute(c.Request.Context(), id)
 	if err != nil {
 		if err == exception.ErrTenantNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -105,17 +106,17 @@ func (h *TenantHandler) GetTenantByID(c *gin.Context) {
 func (h *TenantHandler) GetTenantBySlug(c *gin.Context) {
 	slug := c.Param("slug")
 	if slug == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Slug is required"})
+		httpresp.JSON(c, http.StatusBadRequest, "Slug is required")
 		return
 	}
 
 	response, err := h.getTenantBySlugUseCase.Execute(c.Request.Context(), slug)
 	if err != nil {
 		if err == exception.ErrTenantNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -127,13 +128,13 @@ func (h *TenantHandler) UpdateTenant(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant ID")
 		return
 	}
 
 	var req request.UpdateTenantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -141,15 +142,15 @@ func (h *TenantHandler) UpdateTenant(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrTenantNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 		case exception.ErrTenantDeleted:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot modify deleted tenant"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot modify deleted tenant")
 		case exception.ErrDomainAlreadyExists:
-			c.JSON(http.StatusConflict, gin.H{"error": "Domain already exists"})
+			httpresp.JSON(c, http.StatusConflict, "Domain already exists")
 		case exception.ErrInvalidTenantStatus:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant status"})
+			httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant status")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -162,7 +163,7 @@ func (h *TenantHandler) DeleteTenant(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant ID")
 		return
 	}
 
@@ -170,11 +171,11 @@ func (h *TenantHandler) DeleteTenant(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrTenantNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 		case exception.ErrCannotDeleteTenant:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete tenant"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot delete tenant")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -190,7 +191,7 @@ func (h *TenantHandler) ListTenants(c *gin.Context) {
 	// Ejecutar búsqueda usando el UseCase con criteria
 	result, err := h.listTenantsByCriteriaUseCase.Execute(c.Request.Context(), validCriteria)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno del servidor", "details": err.Error()})
+		httpresp.JSONWithDetails(c, http.StatusInternalServerError, "Error interno del servidor", err.Error())
 		return
 	}
 
@@ -220,13 +221,13 @@ func (h *TenantHandler) SetTenantPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant ID")
 		return
 	}
 
 	var req request.SetPlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -234,15 +235,15 @@ func (h *TenantHandler) SetTenantPlan(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrTenantNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 		case exception.ErrTenantDeleted:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot modify deleted tenant"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot modify deleted tenant")
 		case exception.ErrTenantNotActive:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Tenant is not active"})
+			httpresp.JSON(c, http.StatusForbidden, "Tenant is not active")
 		case exception.ErrPlanNotFound:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Plan not found"})
+			httpresp.JSON(c, http.StatusBadRequest, "Plan not found")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -255,7 +256,7 @@ func (h *TenantHandler) RemoveTenantPlan(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant ID")
 		return
 	}
 
@@ -263,11 +264,11 @@ func (h *TenantHandler) RemoveTenantPlan(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrTenantNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 		case exception.ErrTenantDeleted:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot modify deleted tenant"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot modify deleted tenant")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
@@ -280,7 +281,7 @@ func (h *TenantHandler) UpdateTenantFeatures(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tenant ID"})
+		httpresp.JSON(c, http.StatusBadRequest, "Invalid tenant ID")
 		return
 	}
 
@@ -290,7 +291,7 @@ func (h *TenantHandler) UpdateTenantFeatures(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		httpresp.JSON(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -304,11 +305,11 @@ func (h *TenantHandler) UpdateTenantFeatures(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case exception.ErrTenantNotFound:
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tenant not found"})
+			httpresp.JSON(c, http.StatusNotFound, "Tenant not found")
 		case exception.ErrTenantDeleted:
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot modify deleted tenant"})
+			httpresp.JSON(c, http.StatusForbidden, "Cannot modify deleted tenant")
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			httpresp.JSON(c, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}
