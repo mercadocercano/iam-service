@@ -25,6 +25,9 @@ import (
 	sharedport "github.com/hornosg/go-shared/domain/port"
 	sharedlog "github.com/hornosg/go-shared/infrastructure/logging"
 	sharedmetrics "github.com/hornosg/go-shared/infrastructure/metrics"
+	sharedmigrate "github.com/hornosg/go-shared/migrate"
+
+	iamroot "iam"
 )
 
 var slugRegexp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
@@ -44,6 +47,12 @@ func main() {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
 	defer db.Close()
+
+	// Migraciones versionadas in-app (ADR-001) — fail-fast antes de servir tráfico.
+	dbName := env.Get("DB_NAME", "iam_db")
+	if err := sharedmigrate.RunMigrations(db, iamroot.MigrationsFS, dbName); err != nil {
+		log.Fatalf("Error running migrations: %v", err)
+	}
 
 	// Configuración del router
 	router := gin.New() // Usar gin.New() para evitar middlewares duplicados
