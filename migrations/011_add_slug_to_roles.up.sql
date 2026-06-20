@@ -6,6 +6,42 @@
 -- 1. Columna slug (nullable para no romper filas existentes)
 ALTER TABLE roles ADD COLUMN IF NOT EXISTS slug VARCHAR(50);
 
+-- 1.5. Dedup defensivo de roles de SISTEMA duplicados (idempotente / no-op si no hay).
+--    Causa raíz: en algunos entornos el init-db.sh seedeó los roles de sistema DOS veces
+--    (2 filas por type con tenant_id NULL), lo que rompe el índice único parcial del paso 3
+--    (idx_roles_slug_system). Resolución: conservar el más viejo por type, repuntar
+--    users.role_id de los duplicados al conservado, y borrar los duplicados. Se archivan
+--    los borrados en roles_dup_archive para auditoría/rollback. Acotado a los 4 tipos de
+--    sistema estándar (no toca CUSTOM como cashier/supervisor). Set-based, atómico con la
+--    migración (golang-migrate envuelve en transacción): si algo falla, revierte todo.
+CREATE TABLE IF NOT EXISTS roles_dup_archive AS SELECT * FROM roles WHERE false;
+
+INSERT INTO roles_dup_archive
+SELECT r.* FROM roles r
+JOIN (
+  SELECT id, row_number() OVER (PARTITION BY type ORDER BY created_at ASC, id ASC) AS rn
+  FROM roles
+  WHERE tenant_id IS NULL AND type IN ('SYSTEM_ADMIN','TENANT_ADMIN','USER','READ_ONLY')
+) d ON r.id = d.id AND d.rn > 1;
+
+UPDATE users u SET role_id = k.keeper_id
+FROM (
+  SELECT id,
+         first_value(id) OVER (PARTITION BY type ORDER BY created_at ASC, id ASC) AS keeper_id,
+         row_number()    OVER (PARTITION BY type ORDER BY created_at ASC, id ASC) AS rn
+  FROM roles
+  WHERE tenant_id IS NULL AND type IN ('SYSTEM_ADMIN','TENANT_ADMIN','USER','READ_ONLY')
+) k
+WHERE u.role_id = k.id AND k.rn > 1;
+
+DELETE FROM roles r
+USING (
+  SELECT id, row_number() OVER (PARTITION BY type ORDER BY created_at ASC, id ASC) AS rn
+  FROM roles
+  WHERE tenant_id IS NULL AND type IN ('SYSTEM_ADMIN','TENANT_ADMIN','USER','READ_ONLY')
+) d
+WHERE r.id = d.id AND d.rn > 1;
+
 -- 2. Backfill de los roles de sistema existentes
 UPDATE roles SET slug = 'system_admin' WHERE type = 'SYSTEM_ADMIN' AND slug IS NULL;
 UPDATE roles SET slug = 'tenant_admin' WHERE type = 'TENANT_ADMIN' AND slug IS NULL;
