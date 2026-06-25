@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -18,10 +19,18 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
+	sharedport "github.com/hornosg/go-shared/domain/port"
 	planConfig "iam/src/plan/infrastructure/config"
 	roleConfig "iam/src/role/infrastructure/config"
 	tenantConfig "iam/src/tenant/infrastructure/config"
+	"iam/src/shared/validator"
 )
+
+// noopMetricsRecorder es un MetricsRecorder que no hace nada. Útil para tests
+// de integración que no necesitan emitir métricas reales.
+type noopMetricsRecorder struct{}
+
+func (noopMetricsRecorder) Record(_ sharedport.MetricEvent) {}
 
 // testServer agrupa el servidor HTTP y la DB para los tests de integración.
 type testServer struct {
@@ -74,8 +83,13 @@ func newTestServer(t *testing.T) *testServer {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
+	// Los tests de integración no arrancan por main(), así que registramos
+	// manualmente los validadores custom (slug, etc.).
+	validator.RegisterCustomValidators()
+
 	apiV1 := router.Group("/api/v1")
-	tenantConfig.SetupTenantModule(apiV1, db)
+	tenantConfig.SetupTenantModule(apiV1, db, noopMetricsRecorder{})
+	tenantConfig.SetupTenantProvisionModule(apiV1, db, noopMetricsRecorder{})
 	roleConfig.SetupRoleModule(apiV1, db)
 	planConfig.SetupPlanModule(apiV1, db)
 
@@ -98,7 +112,7 @@ func runMigrations(t *testing.T, db *sql.DB) {
 
 	var sqlFiles []string
 	for _, entry := range entries {
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".up.sql") {
 			sqlFiles = append(sqlFiles, filepath.Join(migrationsDir, entry.Name()))
 		}
 	}

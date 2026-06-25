@@ -52,6 +52,13 @@ func NewTenantHandler(
 	}
 }
 
+// RegisterProvisionRoutes expone SOLO POST /tenants bajo un grupo con scope
+// tenant:provision (whatsapp-agent). El resto de rutas de gestión quedan en
+// RegisterRoutes con scope system:admin.
+func (h *TenantHandler) RegisterProvisionRoutes(router *gin.RouterGroup) {
+	router.POST("/tenants", h.CreateTenant)
+}
+
 // POST /tenants
 func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	var req request.CreateTenantRequest
@@ -317,11 +324,11 @@ func (h *TenantHandler) UpdateTenantFeatures(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// RegisterRoutes registra las rutas HTTP del módulo tenant
+// RegisterRoutes registra las rutas HTTP del módulo tenant (gestión completa,
+// requiere system:admin).
 func (h *TenantHandler) RegisterRoutes(router *gin.RouterGroup) {
 	tenantGroup := router.Group("/tenants")
 	{
-		tenantGroup.POST("", h.CreateTenant)
 		tenantGroup.GET("", h.ListTenants)
 		tenantGroup.GET("/:id", h.GetTenantByID)
 		tenantGroup.GET("/by-slug/:slug", h.GetTenantBySlug)
@@ -332,3 +339,4 @@ func (h *TenantHandler) RegisterRoutes(router *gin.RouterGroup) {
 		tenantGroup.PATCH("/:id/features", h.UpdateTenantFeatures)
 	}
 }
+

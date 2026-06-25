@@ -22,6 +22,7 @@ type roleResponse struct {
 	Type        string   `json:"type"`
 	IsActive    bool     `json:"is_active"`
 	IsSystem    bool     `json:"is_system"`
+	IsTenant    bool     `json:"is_tenant"`
 	Permissions []string `json:"permissions"`
 }
 
@@ -38,6 +39,16 @@ func buildCreateRoleBody(name string) map[string]interface{} {
 		"name":        name,
 		"description": "Rol de prueba de integración para el sistema",
 		"type":        "CUSTOM",
+		"permissions": []string{"tenant:read", "user:read"},
+	}
+}
+
+func buildCreateTenantRoleBody(name, tenantID string) map[string]interface{} {
+	return map[string]interface{}{
+		"name":        name,
+		"description": "Rol de prueba de integración para tenant",
+		"type":        "CUSTOM",
+		"tenant_id":   tenantID,
 		"permissions": []string{"tenant:read", "user:read"},
 	}
 }
@@ -59,6 +70,7 @@ func TestRoles_POST_HappyPath_Returns201(t *testing.T) {
 	assert.Equal(t, "CUSTOM", role.Type)
 	assert.True(t, role.IsActive)
 	assert.False(t, role.IsSystem)
+	assert.True(t, role.IsTenant)
 	assert.NotEmpty(t, role.ID)
 	_, err := uuid.Parse(role.ID)
 	assert.NoError(t, err, "id debe ser UUID válido")
@@ -109,8 +121,7 @@ func TestRoles_GET_ByID_HappyPath_Returns200(t *testing.T) {
 	decodeJSON(t, createResp, &created)
 	require.NotEmpty(t, created.ID)
 
-	resp, err := http.Get(fmt.Sprintf("%s/roles/%s", base, created.ID))
-	require.NoError(t, err)
+	resp := getRequest(t, fmt.Sprintf("%s/roles/%s", base, created.ID))
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -121,12 +132,20 @@ func TestRoles_GET_ByID_HappyPath_Returns200(t *testing.T) {
 	assert.Equal(t, "Rol Get Test", fetched.Name)
 }
 
+func getRequest(t *testing.T, url string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
 func TestRoles_GET_ByID_NotFound_Returns404(t *testing.T) {
 	srv := newTestServer(t)
 	url := fmt.Sprintf("%s/roles/%s", baseURL(srv), uuid.New().String())
 
-	resp, err := http.Get(url)
-	require.NoError(t, err)
+	resp := getRequest(t, url)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -136,8 +155,7 @@ func TestRoles_GET_ByID_InvalidUUID_Returns400(t *testing.T) {
 	srv := newTestServer(t)
 	url := baseURL(srv) + "/roles/not-a-uuid"
 
-	resp, err := http.Get(url)
-	require.NoError(t, err)
+	resp := getRequest(t, url)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -150,8 +168,7 @@ func TestRoles_GET_List_ReturnsPaginationShape(t *testing.T) {
 	postJSON(t, base+"/roles", buildCreateRoleBody("Rol Lista 1"))
 	postJSON(t, base+"/roles", buildCreateRoleBody("Rol Lista 2"))
 
-	resp, err := http.Get(base + "/roles?page=1&page_size=10")
-	require.NoError(t, err)
+	resp := getRequest(t, base+"/roles?page=1&page_size=10")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -177,7 +194,10 @@ func TestRoles_PUT_Update_HappyPath_Returns200(t *testing.T) {
 	require.NotEmpty(t, created.ID)
 
 	newDesc := "Descripcion actualizada del rol de prueba"
-	updateBody := map[string]interface{}{"description": newDesc}
+	updateBody := map[string]interface{}{
+		"name":        "Rol Original",
+		"description": newDesc,
+	}
 	resp := putJSON(t, fmt.Sprintf("%s/roles/%s", base, created.ID), updateBody)
 	defer resp.Body.Close()
 
@@ -229,8 +249,7 @@ func TestRoles_DELETE_SystemRole_Returns403(t *testing.T) {
 	base := baseURL(srv)
 
 	// El seed crea roles de sistema — obtener su ID via listing
-	listResp, err := http.Get(base + "/roles?page=1&page_size=50")
-	require.NoError(t, err)
+	listResp := getRequest(t, base+"/roles?page=1&page_size=50")
 	defer listResp.Body.Close()
 
 	var list listRolesResponse
@@ -238,7 +257,7 @@ func TestRoles_DELETE_SystemRole_Returns403(t *testing.T) {
 
 	var systemRoleID string
 	for _, r := range list.Items {
-		if r.IsSystem {
+		if r.Type == "SYSTEM_ADMIN" {
 			systemRoleID = r.ID
 			break
 		}

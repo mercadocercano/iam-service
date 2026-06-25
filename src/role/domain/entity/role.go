@@ -76,11 +76,11 @@ func (r *Role) HasPermission(permission string) bool {
 }
 
 func (r *Role) IsSystemRole() bool {
-	return r.TenantID == nil
+	return r.Type == value_object.RoleTypeSystemAdmin
 }
 
 func (r *Role) IsTenantRole() bool {
-	return r.TenantID != nil
+	return !r.IsSystemRole()
 }
 
 func (r *Role) CanManageUsers() bool {

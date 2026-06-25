@@ -1,14 +1,44 @@
 package middleware
 
 import (
-	"crypto/subtle"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"iam/src/auth/infrastructure/s2s"
 )
+
+// ScopeMiddlewareFactory crea middlewares que requieren scopes S2S específicos.
+type ScopeMiddlewareFactory struct {
+	jwtSecret string
+	namespace string
+	registry  *s2s.Registry
+}
+
+// NewScopeMiddlewareFactory construye la factory usando el registry cargado al boot.
+func NewScopeMiddlewareFactory(jwtSecret, namespace string, registry *s2s.Registry) *ScopeMiddlewareFactory {
+	return &ScopeMiddlewareFactory{
+		jwtSecret: jwtSecret,
+		namespace: namespace,
+		registry:  registry,
+	}
+}
+
+// RequireScope devuelve un gin.HandlerFunc que autoriza S2S (key + scope) o JWT + rol.
+// allowedRoles solo aplica al flujo humano.
+func (f *ScopeMiddlewareFactory) RequireScope(requiredScope s2s.Scope, allowedRoles ...string) gin.HandlerFunc {
+	return f.RequireScopes([]s2s.Scope{requiredScope}, allowedRoles...)
+}
+
+// RequireScopes es como RequireScope pero permite múltiples scopes S2S. Útil para
+// grupos de rutas que deben aceptar servicios con distintos privilegios (ej.
+// tenant-scoped: system:admin o tenant:admin).
+func (f *ScopeMiddlewareFactory) RequireScopes(requiredScopes []s2s.Scope, allowedRoles ...string) gin.HandlerFunc {
+	return Authorize(f.jwtSecret, f.namespace, f.registry, requiredScopes, allowedRoles...)
+}
 
 // Authorize es el gate de acceso a los endpoints de gestión del IAM (tenants,
 // plans, users, roles). Cierra el agujero histórico: estos endpoints confiaban en
@@ -17,35 +47,41 @@ import (
 //
 // Autoriza a dos tipos de llamador:
 //
-//  1. Servicios internos (S2S): presentan X-API-Key == s2sKey → se permiten como
-//     service-internal. Es el mismo secreto compartido que onboarding/sales/pim ya
-//     envían; un servicio opera cross-tenant en nombre de la plataforma.
+//  1. Servicios internos (S2S): presentan X-API-Key que resuelve contra el
+//     registry. Se permite SOLO si la credencial tiene el scope requerido por
+//     la ruta. Nunca se saltea el scope.
 //
 //  2. Humanos: presentan un Bearer JWT válido (firma, namespace, expiración) cuyo
 //     claim `roles` intersecta allowedRoles. Recursos globales cross-tenant
 //     (tenants, plans) exigen system_admin; los tenant-scoped (users, roles) suman
 //     tenant_admin.
 //
-// Fail-closed: cualquier otra cosa → 401 (sin/credencial inválida) o 403 (rol
+// Fail-closed: cualquier otra cosa → 401 (sin/credencial inválida) o 403 (rol/scope
 // insuficiente). El aislamiento por tenant de los datos devueltos es
 // responsabilidad de la capa de repositorio (filtro tenant_id, RULE-04), NO de
-// este gate: un token system_admin / de servicio es cross-tenant por diseño.
-func Authorize(jwtSecret, namespace, s2sKey string, allowedRoles ...string) gin.HandlerFunc {
+// este gate: un token system_admin / de servicio con system:admin es cross-tenant
+// por diseño.
+func Authorize(jwtSecret, namespace string, registry *s2s.Registry, requiredScopes []s2s.Scope, allowedRoles ...string) gin.HandlerFunc {
 	allowed := make(map[string]struct{}, len(allowedRoles))
 	for _, r := range allowedRoles {
 		allowed[r] = struct{}{}
 	}
 	return func(c *gin.Context) {
-		// 1. Llamador S2S por API key (service-internal). Comparación constant-time:
-		// el secreto S2S es compartido por toda la flota y la vía saltea rol/namespace,
-		// así que evitamos un oráculo de timing sobre la api-key.
-		if s2sKey != "" {
-			provided := c.GetHeader("X-API-Key")
-			if subtle.ConstantTimeCompare([]byte(provided), []byte(s2sKey)) == 1 {
-				c.Set("s2s", true)
-				c.Next()
+		// 1. Llamador S2S por API key + scope. Comparación constant-time.
+		provided := c.GetHeader("X-API-Key")
+		if provided != "" {
+			if cred, ok := registry.Lookup(provided); ok {
+				if cred.HasAnyScope(requiredScopes) {
+					c.Set("s2s", true)
+					c.Set("s2s_service", cred.Service)
+					c.Next()
+					return
+				}
+				// Key válida pero scope insuficiente: 403. No revelamos qué scopes tiene.
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden: insufficient scope"})
 				return
 			}
+			// Key desconocida: no abortamos acá, cae al flujo JWT/401.
 		}
 
 		// 2. Humano por JWT + rol.

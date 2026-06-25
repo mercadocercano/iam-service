@@ -115,8 +115,7 @@ func TestPlans_GET_ByID_HappyPath_Returns200(t *testing.T) {
 	base := baseURL(srv)
 
 	// Obtener un plan existente del seed via listado
-	listResp, err := http.Get(base + "/plans?page=1&page_size=10")
-	require.NoError(t, err)
+	listResp := getRequest(t, base+"/plans?page=1&page_size=10")
 	defer listResp.Body.Close()
 
 	var list listPlansResponse
@@ -125,8 +124,7 @@ func TestPlans_GET_ByID_HappyPath_Returns200(t *testing.T) {
 
 	existingPlanID := list.Items[0].ID
 
-	resp, err := http.Get(fmt.Sprintf("%s/plans/%s", base, existingPlanID))
-	require.NoError(t, err)
+	resp := getRequest(t, fmt.Sprintf("%s/plans/%s", base, existingPlanID))
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -141,8 +139,7 @@ func TestPlans_GET_ByID_NotFound_Returns404(t *testing.T) {
 	srv := newTestServer(t)
 	url := fmt.Sprintf("%s/plans/%s", baseURL(srv), uuid.New().String())
 
-	resp, err := http.Get(url)
-	require.NoError(t, err)
+	resp := getRequest(t, url)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -152,8 +149,7 @@ func TestPlans_GET_ByID_InvalidUUID_Returns400(t *testing.T) {
 	srv := newTestServer(t)
 	url := baseURL(srv) + "/plans/not-a-uuid"
 
-	resp, err := http.Get(url)
-	require.NoError(t, err)
+	resp := getRequest(t, url)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -163,8 +159,7 @@ func TestPlans_GET_List_ReturnsPaginationShape(t *testing.T) {
 	srv := newTestServer(t)
 	base := baseURL(srv)
 
-	resp, err := http.Get(base + "/plans?page=1&page_size=10")
-	require.NoError(t, err)
+	resp := getRequest(t, base+"/plans?page=1&page_size=10")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -184,8 +179,7 @@ func TestPlans_GET_List_DefaultPagination_Returns200(t *testing.T) {
 	srv := newTestServer(t)
 	base := baseURL(srv)
 
-	resp, err := http.Get(base + "/plans")
-	require.NoError(t, err)
+	resp := getRequest(t, base+"/plans")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -200,8 +194,7 @@ func TestPlans_GET_List_ContainsExpectedFields(t *testing.T) {
 	srv := newTestServer(t)
 	base := baseURL(srv)
 
-	resp, err := http.Get(base + "/plans?page=1&page_size=10")
-	require.NoError(t, err)
+	resp := getRequest(t, base+"/plans?page=1&page_size=10")
 	defer resp.Body.Close()
 
 	var listResp listPlansResponse

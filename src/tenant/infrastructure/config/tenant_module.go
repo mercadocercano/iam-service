@@ -51,3 +51,17 @@ func SetupTenantModule(apiGroup *gin.RouterGroup, db *sql.DB, metricsRecorder sh
 
 	return getTenantFeaturesUseCase
 }
+
+// SetupTenantProvisionModule expone SOLO POST /tenants bajo un grupo con scope
+// tenant:provision. Se usa para que whatsapp-agent cree tenants sin darle
+// acceso de lectura/escritura al resto de la gestión de tenants.
+func SetupTenantProvisionModule(apiGroup *gin.RouterGroup, db *sql.DB, metricsRecorder sharedport.MetricsRecorder) {
+	tenantRepo := repository.NewPostgresTenantRepository(db)
+	createTenantUseCase := usecase.NewCreateTenantUseCase(tenantRepo, metricsRecorder)
+	tenantHandler := controller.NewTenantHandler(
+		createTenantUseCase,
+		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil,
+	)
+	tenantHandler.RegisterProvisionRoutes(apiGroup)
+}

@@ -3,6 +3,15 @@
 # Requiere: deployment iam-service aplicado en K8s, secrets DOCR_TOKEN, SSH_PRIVATE_KEY, DROPLET_IP
 #
 # ⚠️ Drift: kubectl set image modifica el deployment en vivo pero NO el YAML del repo.
+#
+# S2S keys: este servicio lee S2S_KEY_WHATSAPP_AGENT, S2S_KEY_ONBOARDING,
+# S2S_KEY_SALES y S2S_KEY_PIM desde el entorno del pod. Esas variables deben
+# existir en el Secret/ConfigMap del deployment ANTES de que corra este workflow.
+# Los valores reales viven en GitHub Actions Secrets y se inyectan durante el
+# deploy (ver README). NO se pasan como build-args de Docker.
+#
+# TODO(devops): automatizar `kubectl apply` del Secret actualizado o sealed-secret
+# para no depender de drift manual en el cluster.
 
 name: Deploy iam-service to Production
 

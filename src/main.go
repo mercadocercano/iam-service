@@ -5,11 +5,8 @@ import (
 	"database/sql"
 	"log"
 	"os"
-	"regexp"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator/v10"
 	"github.com/hornosg/go-shared/infrastructure/env"
 	tenantmw "github.com/hornosg/go-shared/infrastructure/middleware"
 	"github.com/hornosg/go-shared/infrastructure/postgres"
@@ -18,10 +15,12 @@ import (
 	"iam/src/auth/infrastructure/adapter"
 	"iam/src/auth/infrastructure/config"
 	authmw "iam/src/auth/infrastructure/middleware"
+	"iam/src/auth/infrastructure/s2s"
 	planConfig "iam/src/plan/infrastructure/config"
 	roleConfig "iam/src/role/infrastructure/config"
 	tenantConfig "iam/src/tenant/infrastructure/config"
 	userConfig "iam/src/user/infrastructure/config"
+	"iam/src/shared/validator"
 
 	sharedport "github.com/hornosg/go-shared/domain/port"
 	sharedlog "github.com/hornosg/go-shared/infrastructure/logging"
@@ -31,14 +30,8 @@ import (
 	iamroot "iam"
 )
 
-var slugRegexp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]*$`)
-
 func init() {
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("slug", func(fl validator.FieldLevel) bool {
-			return slugRegexp.MatchString(fl.Field().String())
-		})
-	}
+	validator.RegisterCustomValidators()
 }
 
 func main() {
@@ -141,13 +134,22 @@ func main() {
 	// Gates de acceso a los endpoints de gestión. Cierran el agujero del baseline
 	// de Kong: estos endpoints confiaban en el gateway, cuyo fallback anónimo los
 	// dejaba abiertos (ej. GET /api/v1/tenants sin token → 200). Servicios S2S
-	// autorizan por X-API-Key; humanos por JWT + rol.
-	//   - adminGroup       (cross-tenant global): tenants, plans → system_admin
-	//   - tenantScopedGroup (tenant-scoped):      users, roles   → tenant_admin/system_admin
-	s2sAPIKey := env.Get("S2S_API_KEY", "")
+	// autorizan por X-API-Key + scope; humanos por JWT + rol.
+	//   - adminGroup       (cross-tenant global): tenants, plans → system:admin
+	//   - tenantScopedGroup (tenant-scoped):      users, roles   → system:admin or tenant:admin
+	//
+	// El registro S2S carga una credencial por servicio consumidor desde
+	// S2S_KEY_<SERVICE>. Política de scopes vive en código (s2s.ServicePolicy).
+	// Si ninguna key de env está presente, el registro queda vacío: S2S falla
+	// closed (igual que antes si no había S2S_API_KEY).
+	s2sRegistry, err := s2s.LoadFromEnv()
+	if err != nil {
+		log.Fatalf("Error loading S2S registry: %v", err)
+	}
 	jwtSecret := os.Getenv("JWT_SECRET")
-	adminGroup := apiV1.Group("", authmw.Authorize(jwtSecret, serviceNamespace, s2sAPIKey, "system_admin"))
-	tenantScopedGroup := apiV1.Group("", authmw.Authorize(jwtSecret, serviceNamespace, s2sAPIKey, "tenant_admin", "system_admin"))
+	authFactory := authmw.NewScopeMiddlewareFactory(jwtSecret, serviceNamespace, s2sRegistry)
+	adminGroup := apiV1.Group("", authFactory.RequireScope(s2s.ScopeSystemAdmin, "system_admin"))
+	tenantScopedGroup := apiV1.Group("", authFactory.RequireScopes([]s2s.Scope{s2s.ScopeSystemAdmin, s2s.ScopeTenantAdmin}, "tenant_admin", "system_admin"))
 
 	// Configurar módulos en orden de dependencias
 	// 1. User Module (independiente) - retorna UserFinderService
@@ -167,6 +169,12 @@ func main() {
 
 	// 5. Role Module (independiente)
 	roleConfig.SetupRoleModule(tenantScopedGroup, db)
+
+	// 6. Tenant Provision Module — SOLO POST /tenants para whatsapp-agent con scope tenant:provision.
+	// También permitimos system:admin (es un super-scope) para no forzar a onboarding/sales
+	// a tener una key separada de tenant:provision mientras migran.
+	provisionGroup := apiV1.Group("", authFactory.RequireScopes([]s2s.Scope{s2s.ScopeTenantProvision, s2s.ScopeSystemAdmin}, "system_admin"))
+	tenantConfig.SetupTenantProvisionModule(provisionGroup, db, metricsRecorder)
 
 	// Iniciar el servidor
 	port := env.Get("PORT", "8080")

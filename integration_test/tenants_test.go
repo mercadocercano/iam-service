@@ -134,8 +134,7 @@ func TestTenants_GET_ByID_HappyPath_Returns200(t *testing.T) {
 	require.NotEmpty(t, created.ID)
 
 	// Obtener por ID
-	resp, err := http.Get(fmt.Sprintf("%s/tenants/%s", base, created.ID))
-	require.NoError(t, err)
+	resp := getRequest(t, fmt.Sprintf("%s/tenants/%s", base, created.ID))
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -150,8 +149,7 @@ func TestTenants_GET_ByID_NotFound_Returns404(t *testing.T) {
 	srv := newTestServer(t)
 	url := fmt.Sprintf("%s/tenants/%s", baseURL(srv), uuid.New().String())
 
-	resp, err := http.Get(url)
-	require.NoError(t, err)
+	resp := getRequest(t, url)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -161,8 +159,7 @@ func TestTenants_GET_ByID_InvalidUUID_Returns400(t *testing.T) {
 	srv := newTestServer(t)
 	url := baseURL(srv) + "/tenants/not-a-uuid"
 
-	resp, err := http.Get(url)
-	require.NoError(t, err)
+	resp := getRequest(t, url)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -176,8 +173,7 @@ func TestTenants_GET_List_ReturnsPaginationShape(t *testing.T) {
 	postJSON(t, base+"/tenants", buildCreateTenantBody("Tenant List 1", "tenant-list-1"))
 	postJSON(t, base+"/tenants", buildCreateTenantBody("Tenant List 2", "tenant-list-2"))
 
-	resp, err := http.Get(base + "/tenants?page=1&page_size=10")
-	require.NoError(t, err)
+	resp := getRequest(t, base+"/tenants?page=1&page_size=10")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -196,8 +192,7 @@ func TestTenants_GET_List_DefaultPagination_Returns200(t *testing.T) {
 	srv := newTestServer(t)
 	base := baseURL(srv)
 
-	resp, err := http.Get(base + "/tenants")
-	require.NoError(t, err)
+	resp := getRequest(t, base+"/tenants")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -219,7 +214,10 @@ func TestTenants_PUT_Update_HappyPath_Returns200(t *testing.T) {
 	require.NotEmpty(t, created.ID)
 
 	newName := "Tienda Actualizada"
-	updateBody := map[string]interface{}{"name": newName}
+	updateBody := map[string]interface{}{
+		"name":        newName,
+		"description": "Tienda Original Actualizada",
+	}
 	resp := putJSON(t, fmt.Sprintf("%s/tenants/%s", base, created.ID), updateBody)
 	defer resp.Body.Close()
 
